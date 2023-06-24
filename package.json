@@ -1,0 +1,23 @@
+{
+  "name": "esklp-service",
+  "version": "1.0.0",
+  "description": "REST API Service, giving esklp reference updated from goverment FTP",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Goodwill12321/ESKLP-service.git"
+  },
+  "keywords": [
+    "esklp",
+    "reference"
+  ],
+  "author": "VK",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Goodwill12321/ESKLP-service/issues"
+  },
+  "homepage": "https://github.com/Goodwill12321/ESKLP-service#readme"
+}
