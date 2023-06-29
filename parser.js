@@ -16,7 +16,7 @@ client.connect().then((mongoClient=>{
   const db = client.db("esklp");
   const collection = db.collection("mnn");
  
-  function saveData(data) {
+ /* function saveData(data) {
     if (data instanceof Object) {
       xml.pause();
       data["key_name"] = data["$"]  
@@ -34,7 +34,7 @@ client.connect().then((mongoClient=>{
       //xml.resume();
     }
     //console.log(data);
-  }
+  }*/
  
   let batchTemp = [];
   function saveDataBatch(data) {
