@@ -1,7 +1,7 @@
 const MongoClient = require("mongodb").MongoClient;
 const fs = require("fs");
 
-var sax = require('./node_modules/sax/sax.js')
+
 
 const client = new MongoClient("mongodb://127.0.0.1:27017");
  
@@ -40,38 +40,49 @@ client.connect().then((mongoClient=>{
   let batchTemp = [];
   function saveDataBatch(data) {
     if (data instanceof Object) {
-      //xml.pause();
-      data["key_name"] = data["$"] 
-      data["$"] ? delete data["$"] : null;
-      if (batchTemp.length < 500) {
+      if (batchTemp.length < 10) {
         batchTemp.push(data);
         //xml.resume();
+        ins ++;
         if (ins % 10 == 0)
           console.info("➕  ", ins); 
       } else {
         
-        xml.pause();
-
+       // xml.pause();
         if (batchTemp.includes(data))
           console.log("Duplicate object " + data);
         else
+        {
           batchTemp.push(data);
-        
           collection.insertMany(batchTemp).then(result => {
-          //console.log(data);
-            console.info("➕  " + ins + " all " + cnt_all);
-            batchTemp = [];
-            xml.resume()}, 
-          err =>{
-            console.log(data);
-            Errors.push(err);
-            xml.resume();
-            batchTemp = [];
-          });
+            //console.log(data);
+              console.info("➕  " + ins + " all " + cnt_all);
+              batchTemp = [];
+              //xml.resume()
+            }, 
+            err =>{
+              console.log(data);
+              Errors.push(err);
+              //xml.resume();
+              batchTemp = [];
+            })
+        }
       }
     }
   }
   
+
+  function normalizeProduct(product) {
+    product.children = null;
+    if (product['SMNN_LIST'])
+      for (child of product['SMNN_LIST'].children)
+        for (key in child) {
+          if (key['children'] && key['children'].length == 1){
+            key.value = key.children[0];
+          }
+      }      
+  }
+
   console.log("Current directory:", __dirname);
 
   /*const streamWrite = fs.createWriteStream("./data/extract.json");
@@ -86,25 +97,41 @@ client.connect().then((mongoClient=>{
   
   //var parser = sax.parser(true);
 
+  var sax = require('./sax.js')
+
   var saxStream = sax.createStream(false)
 
-  const tagCollect = "NS2:GROUP_LIST";
+  const tagCollect = "NS2:GROUP";
   products = []
   product = undefined
   currentTag = undefined
 
   saxStream.on("closetag" , function (tagName) {
-    if (tagName === tagCollect) {
-      products.push(product)
-      currentTag = product = null
-      return
+    cnt_all ++;
+    if (tagName === tagCollect && product != null) {
+        if (product.children.length > 1)
+        {
+          if (product.parent)
+          { //product.parent = null;
+            product.parent.children = null;
+            if (product.parent.parent) {
+              product.parent.parent.children = null;
+              if (product.parent.parent.parent)
+                  product.parent.parent.parent = null;  
+            }    
+          }
+        products.push(product)
+        saveDataBatch(product)
+        currentTag = product = null
+        return
+    }
     }
     if (currentTag && currentTag.parent) {
       var p = currentTag.parent
       delete currentTag.parent
       currentTag = p
     }
-    console.log(tagName);
+    //console.log(tagName);
   })
 
   saxStream.on("opentag" ,  function (tag) {
@@ -115,18 +142,21 @@ client.connect().then((mongoClient=>{
     tag.parent = currentTag
     tag.children = []
     tag.parent && tag.parent.children.push(tag)
+    if(tag.parent)
+      tag.parent[tag.name.replace('NS2:', '')] = tag;
     currentTag = tag
-    console.log(tag.name);
+    //console.log(tag.name);
   })
 
   saxStream.on("text", function (text) {
     if (currentTag) 
       currentTag.children.push(text)
-    console.log(text);
+    //console.log(text);
   });
 
   const stream = fs.createReadStream(clientPath)
-      .pipe(saxStream);//"/home/victor/projects/Node/esklp/data/esklp_20230621_full_21.5_00001_0001.xml");
+      .pipe(saxStream);
+      //"/home/victor/projects/Node/esklp/data/esklp_20230621_full_21.5_00001_0001.xml");
 
   //const stream = fs.createReadStream("./esklp/data/1.xml");
 
