@@ -77,8 +77,8 @@ client.connect().then((mongoClient=>{
     if (product['SMNN_LIST'])
       for (child of product['SMNN_LIST'].children)
         for (key in child) {
-          if (key['children'] && key['children'].length == 1){
-            key.value = key.children[0];
+          if (child[key]['children'] && child[key]['children'].length == 1){
+            key.key_value = child[key]['children'][0];
           }
       }      
   }
@@ -120,11 +120,12 @@ client.connect().then((mongoClient=>{
                   product.parent.parent.parent = null;  
             }    
           }
-        products.push(product)
-        saveDataBatch(product)
-        currentTag = product = null
-        return
-    }
+          normalizeProduct(product);
+          products.push(product)
+          saveDataBatch(product)
+          currentTag = product = null
+          return
+        }
     }
     if (currentTag && currentTag.parent) {
       var p = currentTag.parent
