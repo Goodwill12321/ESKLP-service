@@ -77,8 +77,19 @@ client.connect().then((mongoClient=>{
     if (product['SMNN_LIST'])
       for (child of product['SMNN_LIST'].children)
         for (key in child) {
-          if (child[key]['children'] && child[key]['children'].length == 1){
-            key.key_value = child[key]['children'][0];
+          rekv = child[key];
+          if (rekv['children'])
+          {
+            if (rekv['children'].length == 1){
+            rekv['key_value'] = rekv['children'][0];
+            rekv['children'] = null;
+            }
+            else if (rekv['children'].length > 1){
+              for (ch of rekv['children'])
+                if (ch['children'] && ch['children'].length == 1) {
+                    
+                }
+            } 
           }
       }      
   }
