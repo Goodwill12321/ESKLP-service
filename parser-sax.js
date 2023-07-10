@@ -89,7 +89,7 @@ client.connect().then((mongoClient => {
         } 
       }*/
     }
-    for (rekv in product)
+    for (let rekv in product)
     {
       if (rekv == 'attributes')
       {
@@ -165,6 +165,7 @@ client.connect().then((mongoClient => {
 
   const tagCollect = "NS2:GROUP";
   products = []
+  cur_ch = undefined
   product = undefined
   currentTag = undefined
 
@@ -188,31 +189,64 @@ client.connect().then((mongoClient => {
     //console.log(tagName);
   })
 
-  
-  function cloneTag(tag, copy_parent = 100, copy_children = true)
+  function tagNameUniq(tag_children, child_name)
+  {
+    let cnt = 0;
+    for (let ch of tag_children)
+    {
+      if (ch['name'] && ch.name == child_name)
+        cnt ++;
+    }
+    return cnt < 2;
+  }
+
+  function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1)
   {
     let clone = {}; 
     if (tag instanceof Object)
     {
       // новый пустой объект
       if ( tag.name )
-        clone.name = tag.name.replace('NS2:', '');
+        clone.tag_name = tag.name;
       if (copy_parent > 0 && tag['parent'])
-        clone.parent = cloneTag(tag.parent, copy_parent - 1, false);
+        clone.parent = cloneTag(tag.parent, copy_parent - 1, false, level + 1);
       if (tag['attributes']){
-        for (attr in tag.attributes)
+        for (let attr in tag.attributes)
         {
           clone['ATTR_' + attr] = tag.attributes[attr];    
         }
       }
       if (copy_children && tag['children']){
-      clone.children = [];
-      for (ch of tag.children)
-      {
-        clone.children.push(cloneTag(ch))
+        clone.children = [];
+        for (let child of tag.children)
+        {
+          if (child['children'] 
+              && child['children'].length == 1 
+              && !(child['children'][0] instanceof Object) 
+              && child['name']
+              )
+          {  
+            clone[child.name.replace('NS2:', '')] = child['children'][0];
+          }
+          else if (child['name']  
+                  && tag.name.indexOf('LIST') == 0 
+                  && (tag.children.length == 1 || tagNameUniq(tag.children, child.name)))
+          {
+            /*if (level == 1)
+              cur_ch = child;*/
+            cl_ch = cloneTag(child, 0, true, level + 1);
+            clone[child.name.replace('NS2:', '')] = cl_ch;  
+          }
+          else
+          {
+            cl_ch = cloneTag(child, 0, true, level + 1);
+            clone.children.push(cl_ch);
+          }
+        }
+        if (clone.children.length == 0)
+          delete clone.children;
       }
-      }
-      for (key in tag)
+      for (let key in tag)
       {
         if (key != 'attributes' && key != 'name' && key != 'children' && key != 'parent' && key != 'isSelfClosing')
           clone[key] = tag[key];
