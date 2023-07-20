@@ -14,7 +14,7 @@ function tagNameUniq(tag_children, child_name)
 
 
 //клонирование структуры тэга с ее упрощением (уменьшение уровней вложенности и убиранием лишних структур - иначе слишком большие структуры не помещаются в бд)
-function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1)
+function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpList = undefined, MNN_UUID = "")
 {
   let clone = {}; 
   if (tag instanceof Object)
@@ -34,18 +34,34 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1)
     }
     if (copy_children && tag['children'] && tag.children.length > 0)
     {
-      if (tag.children.length == 1 //если ребенок один, его можно перенести в реквизит родителя (кроме списков)
+      if (tag.name == "NS2:KLP_LIST")
+      {
+          clone.children = [];
+          if (typeof klpList == 'undefined')
+            klpList = [];
+          for (let child of tag.children) 
+          { 
+            let clChild = cloneTag(child, 100, true, 1);
+            clChild.parent_MNN_UUID = MNN_UUID;
+            clChild.parent_SMNN_UUID = clone.attr_UUID;
+            klpList.push(clChild);
+            clone.children.push(clChild.attr_UUID);
+          }    
+      }
+      else if (tag.children.length == 1 //если ребенок один, его можно перенести в реквизит родителя (кроме списков)
         && tag.children[0]['name'] 
         && tag.name.indexOf('LIST') == -1 ) //для списков обязательно должны быть дети, даже если он 1
       {
         child = tag.children[0];
-        clone[child.name.replace('NS2:', '')] = child instanceof Object ?  cloneTag(child, 0, true, level + 1) : child;    
+        clone[child.name.replace('NS2:', '')] = child instanceof Object ?  cloneTag(child, 0, true, level + 1, klpList, MNN_UUID) : child;    
       }
       else
       {
         clone.children = [];
         for (let child of tag.children) 
         {
+         /* if (tag.name = '')
+            klpList*/
           if (child['name']
             && tag.name.indexOf('LIST') == -1) //вместо "детей" - реквизит 
           {
@@ -56,7 +72,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1)
                 && child.name.indexOf('LIST') == -1)
               chld = child.children[0]; //когду у ребенка есть 1 ребенок - то перепрыгиваем через уровень 
 
-            clone[child.name.replace('NS2:', '')] = chld instanceof Object ? cloneTag(chld, 0, true, level + 1) : chld;
+            clone[child.name.replace('NS2:', '')] = chld instanceof Object ? cloneTag(chld, 0, true, level + 1, klpList, MNN_UUID) : chld;
           }
           else 
           { 
@@ -69,7 +85,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1)
               chld = {};
               chld[child.name] = child.children[0];
             }
-            clone.children.push(chld instanceof Object ? cloneTag(chld, 0, true, level + 1) : chld); 
+            clone.children.push(chld instanceof Object ? cloneTag(chld, 0, true, level + 1, klpList, MNN_UUID) : chld); 
           }
 
         }
@@ -109,8 +125,12 @@ function loadFile(filePath) {
 
     
     let Errors = [];
+    products = [];
+    klpList = [];
+
     const db = client.db("esklp");
-    const collection = db.collection("mnn");
+    const collectionMNN = db.collection("mnn");
+    const collectionKLP = db.collection("klp");
 
       
     let batchTemp = [];
@@ -129,7 +149,7 @@ function loadFile(filePath) {
             console.log("Duplicate object " + data);
           else {
             batchTemp.push(data);
-            collection.insertMany(batchTemp).then(result => {
+            collectionMNN.insertMany(batchTemp).then(result => {
               //console.log(data);
               console.info("➕  " + ins + " all " + cnt_all);
               //xml.resume()
@@ -140,6 +160,14 @@ function loadFile(filePath) {
                 //xml.resume();
               });
               batchTemp = [];
+              collectionKLP.insertMany(klpList).then(result => {
+                console.info("klp");
+              },
+                err => {
+                  console.log(err);
+                  Errors.push(err);
+                });
+                klpList = [];
           }
         }
       }
@@ -164,7 +192,8 @@ function loadFile(filePath) {
     var saxStream = sax.createStream(false)
 
     const tagCollect = "NS2:GROUP";
-    products = []
+    
+        
     cur_ch = undefined
     product = undefined
     currentTag = undefined
@@ -174,7 +203,7 @@ function loadFile(filePath) {
       if (tagName === tagCollect && product != null) {
         if (product.children.length > 1) {
         // normalizeProduct(product);
-          product_clone = cloneTag(product);
+          product_clone = cloneTag(product, 100, true, 1, klpList, product.attributes.UUID);
           products.push(product_clone)
           saveDataBatch(product_clone)
           currentTag = product = product_clone = null
@@ -183,7 +212,7 @@ function loadFile(filePath) {
       }
       if (currentTag && currentTag.parent) {
         var p = currentTag.parent
-        delete currentTag.parent
+        //delete currentTag.parent
         currentTag = p
       }
       //console.log(tagName);
@@ -207,6 +236,10 @@ function loadFile(filePath) {
       if (currentTag)
         currentTag.children.push(text)
       //console.log(text);
+    });
+
+    saxStream.on("end", function () {
+      console.log("finished document!");
     });
 
     const stream = fs.createReadStream(clientPath)
