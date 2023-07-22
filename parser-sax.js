@@ -14,46 +14,55 @@ function tagNameUniq(tag_children, child_name)
 
 
 //клонирование структуры тэга с ее упрощением (уменьшение уровней вложенности и убиранием лишних структур - иначе слишком большие структуры не помещаются в бд)
-function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpList = undefined, MNN_UUID = "")
+function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpList = undefined, MNN_UUID = "", SMNN_UUID = "")
 {
   let clone = {}; 
   if (tag instanceof Object)
   {
-    // новый пустой объект
     if ( tag.name )
       clone.tag_name = tag.name;
     
+      //клонирование родителей до 100 уровня
     if (copy_parent > 0 && tag['parent'])
       clone.parent = cloneTag(tag.parent, copy_parent - 1, false, level + 1);
 
+    //клонировние атрибутов  
     if (tag['attributes']){
       for (let attr in tag.attributes)
       {
         clone['attr_' + attr] = tag.attributes[attr];    
       }
     }
+
+    //клонирование детей с поднятием уровня (через 1 или на 1)
     if (copy_children && tag['children'] && tag.children.length > 0)
     {
-      if (tag.name == "NS2:KLP_LIST")
+      let lSMNN_UUID = null;
+      //запоминаем текущий SMNN UUID
+      if (tag.name == 'NS2:SMNN')
+        lSMNN_UUID = clone.attr_UUID;
+
+      if (tag.name == "NS2:KLP_LIST") //klp - Отдельная коллекция подчиненная
       {
           clone.children = [];
           if (typeof klpList == 'undefined')
             klpList = [];
           for (let child of tag.children) 
           { 
-            let clChild = cloneTag(child, 100, true, 1);
-            clChild.parent_MNN_UUID = MNN_UUID;
-            clChild.parent_SMNN_UUID = clone.attr_UUID;
+            let clChild = cloneTag(child, 100, true, 1); //клонируем КЛП 
+            
+            clChild.parent_MNN_UUID = MNN_UUID; //проставялем внешние ключи  - это самый высокий уровень МНН
+            clChild.parent_SMNN_UUID = SMNN_UUID; //это подчиненный СМНН
             klpList.push(clChild);
-            clone.children.push(clChild.attr_UUID);
+            clone.children.push(clChild.attr_UUID); //в оригинальный элемент запоминаем только UUID KLP
           }    
       }
       else if (tag.children.length == 1 //если ребенок один, его можно перенести в реквизит родителя (кроме списков)
-        && tag.children[0]['name'] 
+        && tag.children[0]['name'] //если есть имя создаем такой реквизит с именем
         && tag.name.indexOf('LIST') == -1 ) //для списков обязательно должны быть дети, даже если он 1
       {
         child = tag.children[0];
-        clone[child.name.replace('NS2:', '')] = child instanceof Object ?  cloneTag(child, 0, true, level + 1, klpList, MNN_UUID) : child;    
+        clone[child.name.replace('NS2:', '')] = child instanceof Object ?  cloneTag(child, 0, true, level + 1, klpList, MNN_UUID, lSMNN_UUID) : child;    
       }
       else
       {
@@ -70,9 +79,9 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
             if (child['children'] 
                 && child.children.length == 1
                 && child.name.indexOf('LIST') == -1)
-              chld = child.children[0]; //когду у ребенка есть 1 ребенок - то перепрыгиваем через уровень 
+              chld = child.children[0]; //когда у ребенка есть 1 ребенок - то перепрыгиваем через уровень 
 
-            clone[child.name.replace('NS2:', '')] = chld instanceof Object ? cloneTag(chld, 0, true, level + 1, klpList, MNN_UUID) : chld;
+            clone[child.name.replace('NS2:', '')] = chld instanceof Object ? cloneTag(chld, 0, true, level + 1, klpList, MNN_UUID, lSMNN_UUID) : chld;
           }
           else 
           { 
@@ -85,7 +94,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
               chld = {};
               chld[child.name] = child.children[0];
             }
-            clone.children.push(chld instanceof Object ? cloneTag(chld, 0, true, level + 1, klpList, MNN_UUID) : chld); 
+            clone.children.push(chld instanceof Object ? cloneTag(chld, 0, true, level + 1, klpList, MNN_UUID, lSMNN_UUID) : chld); 
           }
 
         }
@@ -93,6 +102,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
           delete clone.children;
       } 
     }
+    //клонируем все остальные реквизиты  
     for (let key in tag)
     {
       if (key != 'attributes' && key != 'name' && key != 'children' && key != 'parent' && key != 'isSelfClosing')
