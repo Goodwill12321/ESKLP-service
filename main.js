@@ -33,7 +33,7 @@ function get_MNN(name, exactly, res, withKLP)
         //массив промисов для ожидания получения подчиненных КЛП
         let promises = [];
         //соответствие СМНН - узла массива СМНН по его UUID, чтобы обработать в конечном then после обработки массивов КЛП и добавить подчиненный элемент
-        let promises_smnn = {};
+        let smnn_uuid = {};
 
         allDocuments.then(arr => {
             arr.forEach(doc => {
@@ -46,7 +46,7 @@ function get_MNN(name, exactly, res, withKLP)
                         //сохраняем пропмис в массив чтобы потом дождаться их всех перед отправкой
                         promises.push(cursorKLP.toArray());
                         //сохраняем в словарь соответствие СНММ его УУИД чтобы не перебирать потом всю структуру для его поиска после Promise.all
-                        promises_smnn[smnn.attr_UUID] = smnn;
+                        smnn_uuid[smnn.attr_UUID] = smnn;
                     });
                 };
                 //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
@@ -58,7 +58,7 @@ function get_MNN(name, exactly, res, withKLP)
             Promise.all(promises).then(arraysKLP => {
                 for (arrKLP of arraysKLP) {
                     for (klp of arrKLP) {
-                        promises_smnn[klp.parent_SMNN_UUID].KLP_LIST_JOINED.push(klp);
+                        smnn_uuid[klp.parent_SMNN_UUID].KLP_LIST_JOINED.push(klp);
                     }
                 }
             }).then(r => {   //после того, как все заполнено, возвращаем обогащенные МНН
@@ -71,6 +71,38 @@ function get_MNN(name, exactly, res, withKLP)
     
 }
 
+
+
+function get_KLP(smnn_uid, res)
+{
+    console.time('get_KLP');
+    client.connect().then(mongoClient => {
+    console.log("Подключение установлено");
+
+    const db = client.db("esklp");
+    //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
+    const col_KLP = db.collection("klp");
+    //ищем МНН по имени
+    const cursorKLP = col_KLP.find({ 'parent_SMNN_UUID': smnn_uid });
+
+    //массив возвращаемых документов
+    let docs = [];
+    //асинхронный вызов получения массива документов
+    const allDocuments = cursorKLP.toArray();
+
+
+    allDocuments.then(arr => {
+        arr.forEach(doc => {
+            //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
+            docs.push(doc);
+        });}).then(r => {   //после того, как все заполнено, возвращаем KLP
+            res.send(docs);
+            console.timeEnd('get_KLP');
+        });
+
+    
+    });
+}
 
 
 app.get('/mnn_by_name_exact/:name', function(req, res) {
@@ -94,6 +126,11 @@ app.get('/mnn_by_name_like_with_klp/:pattern', function(req, res) {
     const name = req.params.pattern;
     get_MNN(name, false, res, true);
  });   
+
+ app.get('/klp_by_smnn_uuid/:smnn_uid', function(req, res) {
+    const smnn_uid = req.params.smnn_uid;
+    get_KLP(smnn_uid, res);
+ });   
     
  
 /*const bodyParser = require('body-parser');
@@ -115,5 +152,5 @@ app.get('/mnn_by_name_like_with_klp/:pattern', function(req, res) {
 
 app.listen(port,()=>{
 	console.log(`Server run on ${port} port`)
-})
+});
 
