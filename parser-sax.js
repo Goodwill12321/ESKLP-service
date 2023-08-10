@@ -39,12 +39,13 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
     {
       let lSMNN_UUID = null;
       //запоминаем текущий SMNN UUID
-      if (tag.name == 'NS2:SMNN')
+      if (tag.name.toUpperCase() == 'NS2:SMNN')
         lSMNN_UUID = clone.attr_UUID;
 
-      if (tag.name == "NS2:KLP_LIST") //klp - Отдельная коллекция подчиненная
+      if (tag.name.toUpperCase() == "NS2:KLP_LIST") //klp - Отдельная коллекция подчиненная
       {
           clone.children = [];
+          clone.TradeNames = [];
           if (typeof klpList == 'undefined')
             klpList = [];
           for (let child of tag.children) 
@@ -55,14 +56,19 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
             clChild.parent_SMNN_UUID = SMNN_UUID; //это подчиненный СМНН
             klpList.push(clChild);
             clone.children.push(clChild.attr_UUID); //в оригинальный элемент запоминаем только UUID KLP
+            if (clone.TradeNames.indexOf(clChild.trade_name) == -1)
+            {
+              clone.TradeNames.push(clChild.trade_name); 
+            }
+              
           }    
       }
       else if (tag.children.length == 1 //если ребенок один, его можно перенести в реквизит родителя (кроме списков)
         && tag.children[0]['name'] //если есть имя создаем такой реквизит с именем
-        && tag.name.indexOf('LIST') == -1 ) //для списков обязательно должны быть дети, даже если он 1
+        && tag.name.indexOf('list') == -1 ) //для списков обязательно должны быть дети, даже если он 1
       {
         child = tag.children[0];
-        clone[child.name.replace('NS2:', '')] = child instanceof Object ?  cloneTag(child, 0, true, level + 1, klpList, MNN_UUID, lSMNN_UUID) : child;    
+        clone[child.name.replace('ns2:', '')] = child instanceof Object ?  cloneTag(child, 0, true, level + 1, klpList, MNN_UUID, lSMNN_UUID) : child;    
       }
       else
       {
@@ -72,16 +78,16 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
          /* if (tag.name = '')
             klpList*/
           if (child['name']
-            && tag.name.indexOf('LIST') == -1) //вместо "детей" - реквизит 
+            && tag.name.indexOf('list') == -1) //вместо "детей" - реквизит 
           {
             let chld = child;
             
             if (child['children'] 
                 && child.children.length == 1
-                && child.name.indexOf('LIST') == -1)
+                && child.name.indexOf('list') == -1)
               chld = child.children[0]; //когда у ребенка есть 1 ребенок - то перепрыгиваем через уровень 
 
-            clone[child.name.replace('NS2:', '')] = chld instanceof Object ? cloneTag(chld, 0, true, level + 1, klpList, MNN_UUID, lSMNN_UUID) : chld;
+            clone[child.name.replace('ns2:', '')] = chld instanceof Object ? cloneTag(chld, 0, true, level + 1, klpList, MNN_UUID, lSMNN_UUID) : chld;
           }
           else 
           { 
@@ -89,7 +95,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
             if (child['children'] 
                 && child.children.length == 1
                 && child['name']
-                && child.name.indexOf('LIST') == -1)
+                && child.name.indexOf('list') == -1)
             {
               chld = {};
               chld[child.name] = child.children[0];
@@ -199,7 +205,7 @@ function loadFile(filePath) {
 
     var sax = require('./sax.js')
 
-    var saxStream = sax.createStream(false)
+    var saxStream = sax.createStream(true)
 
     const tagCollect = "NS2:GROUP";
     
@@ -210,7 +216,7 @@ function loadFile(filePath) {
 
     saxStream.on("closetag", function (tagName) {
       cnt_all++;
-      if (tagName === tagCollect && product != null) {
+      if (tagName.toUpperCase() === tagCollect && product != null) {
         if (product.children.length > 1) {
         // normalizeProduct(product);
           product_clone = cloneTag(product, 100, true, 1, klpList, product.attributes.UUID);
@@ -229,8 +235,8 @@ function loadFile(filePath) {
     })
 
     saxStream.on("opentag", function (tag) {
-      if (tag.name !== tagCollect && !product) return
-      if (tag.name === tagCollect) {
+      if (tag.name.toUpperCase() !== tagCollect && !product) return
+      if (tag.name.toUpperCase() === tagCollect) {
         product = tag;
       }
       tag.parent = currentTag
