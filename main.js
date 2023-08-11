@@ -20,11 +20,15 @@ function get_MNN(name, exactly, res, withKLP)
         const col_KLP = db.collection("klp");
         //ищем МНН по имени
         let cursor = undefined;
+         
         if (exactly)
-            cursor = col_MNN.find({ 'attr_NAME': name });
+            query = { 'attr_namr': name };
         else
-            cursor = col_MNN.find({ 'attr_NAME': { $regex: name, $options : "i"}});    
-
+            query = { 'attr_name': { $regex: name, $options : "i"}};
+        
+        console.log(query);    
+        cursor = col_MNN.find(query);    
+        
         //массив возвращаемых документов
         let docs = [];
         //асинхронный вызов получения массива документов
