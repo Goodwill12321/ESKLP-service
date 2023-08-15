@@ -7,7 +7,7 @@ const MongoClient = require("mongodb").MongoClient;
 const client = new MongoClient("mongodb://127.0.0.1:27017");
 
 
-function get_MNN(name, exactly, res, withKLP)
+function get_MNN(name, only_actual, exactly, withKLP, res)
 {
     console.time('get_MNN');
     client.connect().then(mongoClient => {
@@ -20,14 +20,20 @@ function get_MNN(name, exactly, res, withKLP)
         const col_KLP = db.collection("klp");
         //ищем МНН по имени
         let cursor = undefined;
-         
+       
         if (exactly)
-            query = { 'attr_namr': name };
+            query_name = { 'attr_namr': name };
         else
-            query = { 'attr_name': { $regex: name, $options : "i"}};
+            query_name = { 'attr_name': { $regex: name, $options : "i"}};
+
+        if (only_actual)
+            query = {$and : [query_name, {"smnn_list.children.date_end" : { $exists:false}}]};
+        else
+            query = query_name;
         
-        console.log(query);    
-        cursor = col_MNN.find(query);    
+        
+        console.log('query = ' + JSON.stringify(query));    
+        cursor = col_MNN.find(query).sort({'attr_name': 1});    
         
         //массив возвращаемых документов
         let docs = [];
@@ -42,8 +48,8 @@ function get_MNN(name, exactly, res, withKLP)
         allDocuments.then(arr => {
             arr.forEach(doc => {
                 console.log(doc);
-                if (withKLP && doc.SMNN_LIST.children.length > 0) {
-                    pr = doc.SMNN_LIST.children.forEach(function (smnn) {
+                if (withKLP && doc.smnn_list.children.length > 0) {
+                    pr = doc.smnn_list.children.forEach(function (smnn) {
                         smnn.KLP_LIST_JOINED = [];
                         //ищем в подчиненной коллекции элементы по внешнему ключу, который хранится в первичном ключе СМНН attr_UUID
                         const cursorKLP = col_KLP.find({ 'parent_SMNN_UUID': smnn.attr_UUID });
@@ -109,13 +115,16 @@ function get_KLP(smnn_uid, res)
 }
 
 
-app.get('/mnn_by_name_exact/:name', function(req, res) {
+app.get('/mnn_by_name/:exact/:with_klp/:only_actual/:name', function(req, res) {
     const name = req.params.name;
-    get_MNN(name, true, res, false);
+    exact = req.params.exact == "1";
+    with_klp = req.params.with_klp == "1";
+    only_actual = req.params.only_actual == "1";
+    get_MNN(name, only_actual,exact, with_klp, res);
 });   
 
 
-
+/*
 app.get('/mnn_by_name_exact_with_klp/:name', function(req, res) {
     const name = req.params.name;
     get_MNN(name, true, res, true);
@@ -129,7 +138,7 @@ app.get('/mnn_by_name_like/:pattern', function(req, res) {
 app.get('/mnn_by_name_like_with_klp/:pattern', function(req, res) {
     const name = req.params.pattern;
     get_MNN(name, false, res, true);
- });   
+ });  * 
 
  app.get('/klp_by_smnn_uuid/:smnn_uid', function(req, res) {
     const smnn_uid = req.params.smnn_uid;
