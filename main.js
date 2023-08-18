@@ -7,27 +7,27 @@ const MongoClient = require("mongodb").MongoClient;
 const client = new MongoClient("mongodb://127.0.0.1:27017");
 
 
-function get_MNN(name, only_actual, exactly, withKLP, res)
+function get_SMNN(name, only_actual, exactly, withKLP, res)
 {
-    console.time('get_MNN');
+    console.time('get_SMNN');
     client.connect().then(mongoClient => {
         console.log("Подключение установлено");
 
-        const db = client.db("esklp");
+        const db = client.db("esklp_service");
         //коллекция МНН
-        const col_MNN = db.collection("mnn");
+        const col_MNN = db.collection("smnn");
         //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
         const col_KLP = db.collection("klp");
         //ищем МНН по имени
         let cursor = undefined;
        
         if (exactly)
-            query_name = { 'attr_namr': name };
+            query_name = { 'mnn': name };
         else
-            query_name = { 'attr_name': { $regex: name, $options : "i"}};
+            query_name = { 'mnn': { $regex: name, $options : "i"}};
 
         if (only_actual)
-            query = {$and : [query_name, {"smnn_list.children.date_end" : { $exists:false}}]};
+            query = {$and : [query_name, {"date_end" : { $exists:false}}]};
         else
             query = query_name;
         
@@ -73,7 +73,7 @@ function get_MNN(name, only_actual, exactly, withKLP, res)
                 }
             }).then(r => {   //после того, как все заполнено, возвращаем обогащенные МНН
                 res.send(docs);
-                console.timeEnd('get_MNN');
+                console.timeEnd('get_SMNN');
             }
             );
         });
@@ -83,17 +83,17 @@ function get_MNN(name, only_actual, exactly, withKLP, res)
 
 
 
-function get_KLP(smnn_uid, res)
+function get_KLP_smmnn_uuid(smnn_uid, res)
 {
-    console.time('get_KLP');
+    console.time('get_KLP_smmnn_uuid');
     client.connect().then(mongoClient => {
     console.log("Подключение установлено");
 
-    const db = client.db("esklp");
+    const db = client.db("esklp_service");
     //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
     const col_KLP = db.collection("klp");
     //ищем МНН по имени
-    const cursorKLP = col_KLP.find({ 'parent_SMNN_UUID': smnn_uid });
+    const cursorKLP = col_KLP.find({ 'parent_SMNN_UUID': smnn_uid }).sort({'trade_name': 1, 'lf_norm_name' : 1});
 
     //массив возвращаемых документов
     let docs = [];
@@ -107,20 +107,50 @@ function get_KLP(smnn_uid, res)
             docs.push(doc);
         });}).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
-            console.timeEnd('get_KLP');
+            console.timeEnd('get_KLP_smmnn_uuid');
         });
-
-    
     });
 }
 
 
-app.get('/mnn_by_name/:exact/:with_klp/:only_actual/:name', function(req, res) {
+
+function get_KLP_MNN(MNN, res)
+{
+    console.time('get_KLP_MNN');
+    client.connect().then(mongoClient => {
+    console.log("Подключение установлено");
+
+    const db = client.db("esklp_service");
+    //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
+    const col_KLP = db.collection("klp");
+    //ищем МНН по имени
+    const cursorKLP = col_KLP.find({ 'parent_MNN': MNN }).sort({'trade_name': 1, 'lf_norm_name' : 1});
+
+    //массив возвращаемых документов
+    let docs = [];
+    //асинхронный вызов получения массива документов
+    const allDocuments = cursorKLP.toArray();
+
+
+    allDocuments.then(arr => {
+        arr.forEach(doc => {
+            //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
+            docs.push(doc);
+        });}).then(r => {   //после того, как все заполнено, возвращаем KLP
+            res.send(docs);
+            console.timeEnd('get_KLP_MNN');
+        });
+    });
+}
+
+
+
+app.get('/smnn_by_name/:exact/:with_klp/:only_actual/:name', function(req, res) {
     const name = req.params.name;
     exact = req.params.exact == "1";
     with_klp = req.params.with_klp == "1";
     only_actual = req.params.only_actual == "1";
-    get_MNN(name, only_actual,exact, with_klp, res);
+    get_SMNN(name, only_actual,exact, with_klp, res);
 });   
 
 
@@ -138,12 +168,18 @@ app.get('/mnn_by_name_like/:pattern', function(req, res) {
 app.get('/mnn_by_name_like_with_klp/:pattern', function(req, res) {
     const name = req.params.pattern;
     get_MNN(name, false, res, true);
- });  * 
+ });  */
 
  app.get('/klp_by_smnn_uuid/:smnn_uid', function(req, res) {
     const smnn_uid = req.params.smnn_uid;
-    get_KLP(smnn_uid, res);
- });   
+    get_KLP_smmnn_uuid(smnn_uid, res);
+ }); 
+ 
+ 
+ app.get('/klp_by_mnn/:mnn', function(req, res) {
+    const mnn = req.params.mnn;
+    get_KLP_MNN(mnn, res);
+ });
     
  
 /*const bodyParser = require('body-parser');

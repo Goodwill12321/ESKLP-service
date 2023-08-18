@@ -14,7 +14,7 @@ function tagNameUniq(tag_children, child_name)
 
 
 //клонирование структуры тэга с ее упрощением (уменьшение уровней вложенности и убиранием лишних структур - иначе слишком большие структуры не помещаются в бд)
-function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpList = undefined, MNN_UUID = "", SMNN_UUID = "")
+function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnList = undefined, klpList = undefined, MNN_UUID = "", MNN = "", SMNN_UUID = "")
 {
   let clone = {}; 
   if (tag instanceof Object)
@@ -42,7 +42,21 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
       if (tag.name.toUpperCase() == 'NS2:SMNN')
         lSMNN_UUID = clone.attr_UUID;
 
-      if (tag.name.toUpperCase() == "NS2:KLP_LIST") //klp - Отдельная коллекция подчиненная
+      if (tag.name.toUpperCase() == "NS2:SMNN_LIST") //smnn - Отдельная коллекция подчиненная
+      {
+          clone.children = [];
+          if (typeof smnnList == 'undefined')
+            smnnList = [];
+          for (let child of tag.children) 
+          { 
+            let clChild = cloneTag(child, 100, true, 1, undefined, klpList, MNN_UUID, MNN, SMNN_UUID); //клонируем smnn 
+            
+            clChild.parent_MNN_UUID = MNN_UUID; //проставялем внешние ключи  - это самый высокий уровень МНН
+            smnnList.push(clChild);
+            clone.children.push(clChild.attr_UUID); //в оригинальный элемент запоминаем только UUID KLP
+          }    
+      }
+      else if (tag.name.toUpperCase() == "NS2:KLP_LIST") //klp - Отдельная коллекция подчиненная
       {
           clone.children = [];
           clone.TradeNames = [];
@@ -53,7 +67,9 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
             let clChild = cloneTag(child, 100, true, 1); //клонируем КЛП 
             
             clChild.parent_MNN_UUID = MNN_UUID; //проставялем внешние ключи  - это самый высокий уровень МНН
+            clChild.parent_MNN = MNN; //проставялем внешние ключи  - это самый высокий уровень МНН (наименование)
             clChild.parent_SMNN_UUID = SMNN_UUID; //это подчиненный СМНН
+
             klpList.push(clChild);
             clone.children.push(clChild.attr_UUID); //в оригинальный элемент запоминаем только UUID KLP
             if (clone.TradeNames.indexOf(clChild.trade_name) == -1)
@@ -68,7 +84,9 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
         && tag.name.indexOf('list') == -1 ) //для списков обязательно должны быть дети, даже если он 1
       {
         child = tag.children[0];
-        clone[child.name.replace('ns2:', '')] = child instanceof Object ?  cloneTag(child, 0, true, level + 1, klpList, MNN_UUID, lSMNN_UUID) : child;    
+        clone[child.name.replace('ns2:', '')] = child instanceof Object 
+                                                ?  
+                                                cloneTag(child, 0, true, level + 1, smnnList, klpList, MNN_UUID, MNN, lSMNN_UUID) : child;    
       }
       else
       {
@@ -87,7 +105,9 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
                 && child.name.indexOf('list') == -1)
               chld = child.children[0]; //когда у ребенка есть 1 ребенок - то перепрыгиваем через уровень 
 
-            clone[child.name.replace('ns2:', '')] = chld instanceof Object ? cloneTag(chld, 0, true, level + 1, klpList, MNN_UUID, lSMNN_UUID) : chld;
+            clone[child.name.replace('ns2:', '')] = chld instanceof Object 
+                                                    ? 
+                                                    cloneTag(chld, 0, true, level + 1, smnnList, klpList, MNN_UUID, MNN, lSMNN_UUID) : chld;
           }
           else 
           { 
@@ -100,7 +120,9 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, klpLi
               chld = {};
               chld[child.name] = child.children[0];
             }
-            clone.children.push(chld instanceof Object ? cloneTag(chld, 0, true, level + 1, klpList, MNN_UUID, lSMNN_UUID) : chld); 
+            clone.children.push(chld instanceof Object 
+                            ? 
+                            cloneTag(chld, 0, true, level + 1, smnnList, klpList, MNN_UUID, MNN, lSMNN_UUID) : chld); 
           }
 
         }
@@ -142,10 +164,12 @@ function loadFile(filePath) {
     
     let Errors = [];
     products = [];
-    klpList = [];
+    let klpList = [];
+    let smnnList = [];
 
-    const db = client.db("esklp");
+    const db = client.db("esklp_service");
     const collectionMNN = db.collection("mnn");
+    const collectionSMNN = db.collection("smnn");
     const collectionKLP = db.collection("klp");
 
       
@@ -175,15 +199,23 @@ function loadFile(filePath) {
                 Errors.push(err);
                 //xml.resume();
               });
-              batchTemp = [];
-              collectionKLP.insertMany(klpList).then(result => {
-                console.info("klp");
-              },
-                err => {
-                  console.log(err);
-                  Errors.push(err);
-                });
-                klpList = [];
+            batchTemp = [];
+            collectionSMNN.insertMany(smnnList).then(result => {
+              console.info("smnn");
+            },
+              err => {
+                console.log(err);
+                Errors.push(err);
+              });
+            smnnList = [];
+            collectionKLP.insertMany(klpList).then(result => {
+              console.info("klp");
+            },
+              err => {
+                console.log(err);
+                Errors.push(err);
+              });
+            klpList = [];
           }
         }
       }
@@ -219,7 +251,7 @@ function loadFile(filePath) {
       if (tagName.toUpperCase() === tagCollect && product != null) {
         if (product.children.length > 1) {
         // normalizeProduct(product);
-          product_clone = cloneTag(product, 100, true, 1, klpList, product.attributes.UUID);
+          product_clone = cloneTag(product, 100, true, 1, smnnList, klpList, product.attributes.UUID, product.attributes.name);
           products.push(product_clone)
           saveDataBatch(product_clone)
           currentTag = product = product_clone = null
