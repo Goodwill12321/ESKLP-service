@@ -1,3 +1,5 @@
+const { match } = require("assert");
+
 let ins = 0;
 let cnt_all = 0;
 
@@ -11,6 +13,9 @@ function tagNameUniq(tag_children, child_name)
   }
   return cnt < 2;
 }
+
+
+
 
 
 //клонирование структуры тэга с ее упрощением (уменьшение уровней вложенности и убиранием лишних структур - иначе слишком большие структуры не помещаются в бд)
@@ -60,6 +65,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
       {
           clone.children = [];
           clone.TradeNames = [];
+          clone.RegDocs = [];
           if (typeof klpList == 'undefined')
             klpList = [];
           for (let child of tag.children) 
@@ -76,7 +82,40 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
             {
               clone.TradeNames.push(clChild.trade_name); 
             }
-              
+            RegDoc = {};
+            RegDoc.trade_name = clChild.trade_name;
+            RegDoc.num_reg = clChild.num_reg;
+            RegDoc.date_reg = clChild.date_reg;
+            try
+            {
+              RegDoc.owner_name = clChild.owner.name;
+              RegDoc.owner_country_name = clChild.owner.country_name;
+            }
+            catch(err)
+            {
+
+            }  
+            RegDoc.date_reg_end = clChild.date_reg_end;
+            let isExist = false;
+            for (let rd of clone.RegDocs)   
+            {
+              let match = true;
+              for(let attr in rd)
+              {
+                if(rd[attr] != RegDoc[attr])
+                {
+                  match = false;
+                  break;
+                }
+              }
+              if (match)
+              { 
+                isExist = true;
+                break;
+              }
+            }
+            if (!isExist)
+              clone.RegDocs.push(RegDoc);  
           }    
       }
       else if (tag.children.length == 1 //если ребенок один, его можно перенести в реквизит родителя (кроме списков)
