@@ -96,13 +96,15 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
 
             }  
             RegDoc.date_reg_end = clChild.date_reg_end;
+            RegDoc.klpList = [];
+            RegDoc.klpList.push(clChild.attr_UUID);
             let isExist = false;
             for (let rd of clone.RegDocs)   
             {
               let match = true;
               for(let attr in rd)
               {
-                if(rd[attr] != RegDoc[attr])
+                if(attr != 'klpList' && rd[attr] != RegDoc[attr])
                 {
                   match = false;
                   break;
@@ -110,6 +112,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
               }
               if (match)
               { 
+                rd.klpList.push(clChild.attr_UUID);
                 isExist = true;
                 break;
               }
@@ -215,7 +218,7 @@ function loadFile(filePath) {
     let batchTemp = [];
     function saveDataBatch(data) {
       if (data instanceof Object) {
-        if (batchTemp.length < 5) {
+        if (batchTemp.length < 100) {
           batchTemp.push(data);
           //xml.resume();
           ins++;
