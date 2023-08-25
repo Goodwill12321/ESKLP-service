@@ -114,6 +114,35 @@ function get_KLP_smmnn_uuid(smnn_uid, res)
 
 
 
+function get_KLP_MNN(MNN, res)
+{
+    console.time('get_KLP_MNN');
+    client.connect().then(mongoClient => {
+    console.log("Подключение установлено");
+
+    const db = client.db("esklp_service");
+    //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
+    const col_KLP = db.collection("klp");
+    //ищем МНН по имени
+    const cursorKLP = col_KLP.find({ 'parent_MNN': MNN }).sort({'trade_name': 1, 'lf_norm_name' : 1});
+
+    //массив возвращаемых документов
+    let docs = [];
+    //асинхронный вызов получения массива документов
+    const allDocuments = cursorKLP.toArray();
+
+
+    allDocuments.then(arr => {
+        arr.forEach(doc => {
+            //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
+            docs.push(doc);
+        });}).then(r => {   //после того, как все заполнено, возвращаем KLP
+            res.send(docs);
+            console.timeEnd('get_KLP_MNN');
+        });
+    });
+}
+
 function get_KLP_smmnn_uuid_list(smnn_uid_list, res)
 {
     console.time('get_KLP_smmnn_uuid_list');
@@ -143,11 +172,9 @@ function get_KLP_smmnn_uuid_list(smnn_uid_list, res)
     });
 }
 
-
-
-function get_KLP_MNN(MNN, res)
+function get_KLP_uuid_list(klp_uid_list, res)
 {
-    console.time('get_KLP_MNN');
+    console.time('get_KLP_uuid_list');
     client.connect().then(mongoClient => {
     console.log("Подключение установлено");
 
@@ -155,7 +182,7 @@ function get_KLP_MNN(MNN, res)
     //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
     const col_KLP = db.collection("klp");
     //ищем МНН по имени
-    const cursorKLP = col_KLP.find({ 'parent_MNN': MNN }).sort({'trade_name': 1, 'lf_norm_name' : 1});
+    const cursorKLP = col_KLP.find({ 'attr_UUID': {$in : klp_uid_list}}).sort({'trade_name': 1, 'lf_norm_name' : 1});
 
     //массив возвращаемых документов
     let docs = [];
@@ -169,10 +196,14 @@ function get_KLP_MNN(MNN, res)
             docs.push(doc);
         });}).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
-            console.timeEnd('get_KLP_MNN');
+            console.timeEnd('get_KLP_uuid_list');
         });
     });
 }
+
+
+
+
 
 
 
@@ -209,6 +240,12 @@ app.get('/mnn_by_name_like_with_klp/:pattern', function(req, res) {
  app.get('/klp_by_smnn_uuid_list/:smnn_uid_list', function(req, res) {
     const smnn_uid_list_str = req.params.smnn_uid_list;
     get_KLP_smmnn_uuid_list(smnn_uid_list_str.split(","), res);
+ });
+
+
+ app.get('/klp_by_uuid_list/:klp_uid_list', function(req, res) {
+    const klp_uid_list = req.params.klp_uid_list;
+    get_KLP_uuid_list(klp_uid_list.split(","), res);
  });
  
  app.get('/klp_by_mnn/:mnn', function(req, res) {
