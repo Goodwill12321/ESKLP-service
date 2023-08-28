@@ -15,7 +15,16 @@ function tagNameUniq(tag_children, child_name)
 }
 
 
-
+function setAttrValue(clone, attrname, attrvalue_str)
+{
+  if (attrname.replace('ns2:', '') == 'consumer_total')
+    clone[attrname] = Number(attrvalue_str);
+  else if (attrname.replace('ns2:', '').startsWith('date_') || attrname.replace('ns2:', '').endsWith('_date'))
+  {
+    clone[attrname] = attrvalue_str;
+    clone[attrname + "_dt"] = new Date(attrvalue_str);
+  } 
+}
 
 
 //клонирование структуры тэга с ее упрощением (уменьшение уровней вложенности и убиранием лишних структур - иначе слишком большие структуры не помещаются в бд)
@@ -66,6 +75,9 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
           clone.children = [];
           clone.TradeNames = [];
           clone.RegDocs = [];
+
+          clone.lp = [];
+
           if (typeof klpList == 'undefined')
             klpList = [];
           for (let child of tag.children) 
@@ -97,7 +109,10 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
             }  
             RegDoc.date_reg_end = clChild.date_reg_end;
             RegDoc.klpList = [];
+            RegDoc.limPriceList = [];
             RegDoc.klpList.push(clChild.attr_UUID);
+            
+            let RegDocRef = RegDoc;
             let isExist = false;
             for (let rd of clone.RegDocs)   
             {
@@ -112,11 +127,22 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
               }
               if (match)
               { 
-                rd.klpList.push(clChild.attr_UUID);
+                RegDocRef = rd;
                 isExist = true;
                 break;
               }
             }
+            RegDocRef.klpList.push(clChild.attr_UUID);
+            /*if (lChild.klp_lim_price_list) && lChild.klp_lim_price_list.children)
+              for(let lim_price of lChild.klp_lim_price_list.children)
+              {
+                let limprc = {};
+                limprc.barcode = lim_price.barcode;
+                limprc.price_value = lim_price.price_value;
+                limprc.reg_date = lim_price.reg_date;
+                limprc.date_end = lim_price.date_end;
+              }*/
+   
             if (!isExist)
               clone.RegDocs.push(RegDoc);  
           }    
@@ -126,9 +152,11 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
         && tag.name.indexOf('list') == -1 ) //для списков обязательно должны быть дети, даже если он 1
       {
         child = tag.children[0];
-        clone[child.name.replace('ns2:', '')] = child instanceof Object 
-                                                ?  
-                                                cloneTag(child, 0, true, level + 1, smnnList, klpList, MNN_UUID, MNN, lSMNN_UUID) : child;    
+        childName = child.name.replace('ns2:', '');
+        if (child instanceof Object)
+          clone[childName] = cloneTag(child, 0, true, level + 1, smnnList, klpList, MNN_UUID, MNN, lSMNN_UUID)
+        else
+          setAttrValue(clone, childName, child);    
       }
       else
       {
@@ -146,10 +174,13 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
                 && child.children.length == 1
                 && child.name.indexOf('list') == -1)
               chld = child.children[0]; //когда у ребенка есть 1 ребенок - то перепрыгиваем через уровень 
-
-            clone[child.name.replace('ns2:', '')] = chld instanceof Object 
-                                                    ? 
-                                                    cloneTag(chld, 0, true, level + 1, smnnList, klpList, MNN_UUID, MNN, lSMNN_UUID) : chld;
+            
+            childName = child.name.replace('ns2:', '');
+            if (chld instanceof Object)
+              clone[childName] = cloneTag(chld, 0, true, level + 1, smnnList, klpList, MNN_UUID, MNN, lSMNN_UUID)
+            else
+              setAttrValue(clone, childName, chld); 
+                                                   
           }
           else 
           { 
@@ -176,7 +207,17 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
     for (let key in tag)
     {
       if (key != 'attributes' && key != 'name' && key != 'children' && key != 'parent' && key != 'isSelfClosing')
-        clone[key] = tag[key];
+      {
+        /*if (key == 'consumer_total')
+          clone[key] = Number(tag[key]);
+        else if (key.startsWith('date_') || key.endsWith('_date'))
+        {
+          clone[key] = tag[key];
+          clone[key + "_dt"] = Date.parse(tag[key]);
+        }  
+        else*/
+          clone[key] = tag[key];
+      }
     }
   }
   else 

@@ -182,7 +182,9 @@ function get_KLP_uuid_list(klp_uid_list, res)
     //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
     const col_KLP = db.collection("klp");
     //ищем МНН по имени
-    const cursorKLP = col_KLP.find({ 'attr_UUID': {$in : klp_uid_list}}).sort({'trade_name': 1, 'lf_norm_name' : 1});
+
+    
+    const cursorKLP = col_KLP.find({ 'attr_UUID': {$in : klp_uid_list}}).sort({'trade_name': 1, 'lf_norm_name' : 1,'dosage_norm_name' : 1, 'consumer_total' : 1});
 
     //массив возвращаемых документов
     let docs = [];
