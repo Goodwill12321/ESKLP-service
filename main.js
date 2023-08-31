@@ -1,13 +1,19 @@
 const express = require('express')
+const bodyParser = require('body-parser')
 
 const app = express()
+app.use(express.urlencoded({ extended: false }))
+app.use(express.json());
+
+app.use(bodyParser.json())
+
 const port = process.env.PORT || 3000
 
 const MongoClient = require("mongodb").MongoClient;
 const client = new MongoClient("mongodb://127.0.0.1:27017");
 
 
-function get_SMNN(name, only_actual, exactly, withKLP, res)
+function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, res)
 {
     console.time('get_SMNN');
     client.connect().then(mongoClient => {
@@ -21,6 +27,7 @@ function get_SMNN(name, only_actual, exactly, withKLP, res)
         //ищем МНН по имени
         let cursor = undefined;
        
+      
         if (exactly)
             query_name = { 'mnn': name };
         else
@@ -30,10 +37,12 @@ function get_SMNN(name, only_actual, exactly, withKLP, res)
             query = {$and : [query_name, {"date_end" : { $exists:false}}]};
         else
             query = query_name;
-        
+    
+        if (typeof userQuery != 'undefined' && Object.keys(userQuery).length !== 0)
+            query = {$and : [query_name, userQuery]};
         
         console.log('query = ' + JSON.stringify(query));    
-        cursor = col_MNN.find(query).sort({'attr_name': 1});    
+        cursor = col_MNN.find(query).sort({'attr_name': 1}).collation({ locale: 'ru', strength: 1 });    
         
         //массив возвращаемых документов
         let docs = [];
@@ -214,8 +223,21 @@ app.get('/smnn_by_name/:exact/:with_klp/:only_actual/:name', function(req, res) 
     exact = req.params.exact == "1";
     with_klp = req.params.with_klp == "1";
     only_actual = req.params.only_actual == "1";
-    get_SMNN(name, only_actual,exact, with_klp, res);
-});   
+
+    userQuery = {};
+    if ('trade_name' in req.query)
+        userQuery =  {$and : [userQuery, {"klp_list.TradeNames" : req.query.trade_name}]};
+    if ('dosage' in req.query)
+        userQuery =  {$and : [userQuery, {"klp_list.Dosages" : req.query.dosage}]};
+    if ('lek_form' in req.query)
+        userQuery =  {$and : [userQuery, {"klp_list.LekForms" : req.query.lek_form}]};
+    if ('pack_1_name' in req.query)
+        userQuery =  {$and : [userQuery, {"klp_list.Pack1s" : req.query.pack_1_name}]};
+    if ('manufacturer' in req.query)
+        userQuery =  {$and : [userQuery, {"klp_list.Manufacturers" : req.query.manufacturer}]};
+    
+    get_SMNN(name, only_actual,exact, with_klp, userQuery, res);
+}); 
 
 
 /*
@@ -245,9 +267,18 @@ app.get('/mnn_by_name_like_with_klp/:pattern', function(req, res) {
  });
 
 
- app.get('/klp_by_uuid_list/:klp_uid_list', function(req, res) {
-    const klp_uid_list = req.params.klp_uid_list;
-    get_KLP_uuid_list(klp_uid_list.split(","), res);
+ const urlencodedParser = bodyParser.urlencoded({extended: false});
+
+ app.post('/klp_by_uuid_list',  function(req, res) {
+    const klp_uid_list = req.body;
+    let body = '';
+    req.on('data', chunk => {
+        body += chunk.toString();
+    });
+    req.on('end', () => {
+        get_KLP_uuid_list(body.split(","), res);
+    });
+    
  });
  
  app.get('/klp_by_mnn/:mnn', function(req, res) {

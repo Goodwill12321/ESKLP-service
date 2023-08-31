@@ -23,7 +23,10 @@ function setAttrValue(clone, attrname, attrvalue_str)
   {
     clone[attrname] = attrvalue_str;
     clone[attrname + "_dt"] = new Date(attrvalue_str);
-  } 
+  }
+  else
+    clone[attrname] = attrvalue_str;
+   
 }
 
 
@@ -74,9 +77,14 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
       {
           clone.children = [];
           clone.TradeNames = [];
+          clone.Dosages = [];
+          clone.LekForms = [];
+          clone.Pack1s = [];
+          clone.Manufacturers = [];
+          
           clone.RegDocs = [];
 
-          clone.lp = [];
+          //clone.lp = [];
 
           if (typeof klpList == 'undefined')
             klpList = [];
@@ -94,6 +102,24 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
             {
               clone.TradeNames.push(clChild.trade_name); 
             }
+            if (clone.Dosages.indexOf(clChild.dosage_norm_name) == -1)
+            {
+              clone.Dosages.push(clChild.dosage_norm_name); 
+            }
+            if (clone.LekForms.indexOf(clChild.lf_norm_name) == -1)
+            {
+              clone.LekForms.push(clChild.lf_norm_name); 
+            }
+            if (clone.Pack1s.indexOf(clChild.pack_1.name) == -1)
+            {
+              clone.Pack1s.push(clChild.pack_1.name); 
+            }
+            if (clone.Manufacturers.indexOf(clChild.manufacturer.name) == -1)
+            {
+              clone.Manufacturers.push(clChild.manufacturer.name); 
+            }
+            
+
             RegDoc = {};
             RegDoc.trade_name = clChild.trade_name;
             RegDoc.num_reg = clChild.num_reg;
@@ -109,7 +135,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
             }  
             RegDoc.date_reg_end = clChild.date_reg_end;
             RegDoc.klpList = [];
-            RegDoc.limPriceList = [];
+           // RegDoc.limPriceList = [];
             RegDoc.klpList.push(clChild.attr_UUID);
             
             let RegDocRef = RegDoc;
