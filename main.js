@@ -13,11 +13,10 @@ const MongoClient = require("mongodb").MongoClient;
 const client = new MongoClient("mongodb://127.0.0.1:27017");
 
 
-function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, res)
-{
+function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, res) {
     console.time('get_SMNN');
     client.connect().then(mongoClient => {
-        console.log("Подключение установлено");
+        console.log("Подключение к БД установлено");
 
         const db = client.db("esklp_service");
         //коллекция МНН
@@ -26,24 +25,24 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
         const col_KLP = db.collection("klp");
         //ищем МНН по имени
         let cursor = undefined;
-       
-      
+
+
         if (exactly)
             query_name = { 'mnn': name };
         else
-            query_name = { 'mnn': { $regex: name, $options : "i"}};
+            query_name = { 'mnn': { $regex: name, $options: "i" } };
 
         if (only_actual)
-            query = {$and : [query_name, {"date_end" : { $exists:false}}]};
+            query = { $and: [query_name, { "date_end": { $exists: false } }] };
         else
             query = query_name;
-    
+
         if (typeof userQuery != 'undefined' && Object.keys(userQuery).length !== 0)
-            query = {$and : [query_name, userQuery]};
-        
-        console.log('query = ' + JSON.stringify(query));    
-        cursor = col_MNN.find(query).sort({'attr_name': 1}).collation({ locale: 'ru', strength: 1 });    
-        
+            query = { $and: [query, userQuery] };
+
+        console.log('query = ' + JSON.stringify(query));
+        cursor = col_MNN.find(query).sort({ 'attr_name': 1 }).collation({ locale: 'ru', strength: 1 });
+
         //массив возвращаемых документов
         let docs = [];
         //асинхронный вызов получения массива документов
@@ -87,34 +86,99 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
             );
         });
     });
-    
+
 }
 
 
 
-function get_KLP_smmnn_uuid(smnn_uid, res)
-{
+function get_LP(params, res) {
+    console.time('get_LP');
+    client.connect().then(mongoClient => {
+        console.log("Подключение к БД установлено");
+
+        const db = client.db("esklp_service");
+        //коллекция МНН
+        const col_LP = db.collection("lp");
+        //ищем МНН по имени
+        let cursor = undefined;
+
+        if (params.exactly)
+            query_name = { 'mnn': params.mnn };
+        else
+            query_name = { 'mnn': { $regex: params.mnn, $options: "i" } };
+
+        if (params.only_actual)
+            query = { $and: [query_name, { "date_end": { $exists: false } }] };
+        else
+            query = query_name;
+
+
+        if ('trade_name' in params)
+            query = { $and: [query, { "trade_name": params.trade_name }] };
+        if ('dosage' in params)
+            query = { $and: [query, { "dosage_norm_name": params.dosage }] };
+        if ('lek_form' in params)
+            query = { $and: [query, { "lf_norm_name": params.lek_form }] };
+        if ('pack_1_name' in params)
+            query = { $and: [query, { "pack1_name": params.pack_1_name }] };
+        if ('manufacturer' in params)
+            query = { $and: [query, { "manufacturer_name": params.manufacturer }] };
+
+
+        console.log('query = ' + JSON.stringify(query));
+
+        cursor = col_LP.find(query).sort({ 'mnn': 1, 'trade_name': 1, 'lf_norm_name': 1, 'lf_norm_name': 1, 'dosage_norm_name': 1 }).collation({ locale: 'ru', strength: 1 });
+
+        //массив возвращаемых документов
+        let docs = [];
+        //асинхронный вызов получения массива документов
+        const allDocuments = cursor.toArray();
+
+        //соответствие СМНН - узла массива СМНН по его UUID, чтобы обработать в конечном then после обработки массивов КЛП и добавить подчиненный элемент
+        let smnn_uuid = {};
+
+        allDocuments.then(arr => {
+            arr.forEach(doc => {
+                console.log(doc);
+                //добавляем в коллекцию документ МНН
+                docs.push(doc);
+            });
+
+            //ждем все обработки всех массивов. promises - это массив промисов, каждый из которых возвращает массив КЛП. 
+            // Т.е. результатом ожидания будет массив массивов arraysKLP
+
+            res.send(docs);
+            console.timeEnd('get_LP');
+        });
+        ;
+
+    });
+}
+
+
+function get_KLP_smmnn_uuid(smnn_uid, res) {
     console.time('get_KLP_smmnn_uuid');
     client.connect().then(mongoClient => {
-    console.log("Подключение установлено");
+        console.log("Подключение к БД установлено");
 
-    const db = client.db("esklp_service");
-    //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
-    const col_KLP = db.collection("klp");
-    //ищем МНН по имени
-    const cursorKLP = col_KLP.find({ 'parent_SMNN_UUID': smnn_uid }).sort({'trade_name': 1, 'lf_norm_name' : 1});
+        const db = client.db("esklp_service");
+        //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
+        const col_KLP = db.collection("klp");
+        //ищем МНН по имени
+        const cursorKLP = col_KLP.find({ 'parent_SMNN_UUID': smnn_uid }).sort({ 'trade_name': 1, 'lf_norm_name': 1 });
 
-    //массив возвращаемых документов
-    let docs = [];
-    //асинхронный вызов получения массива документов
-    const allDocuments = cursorKLP.toArray();
+        //массив возвращаемых документов
+        let docs = [];
+        //асинхронный вызов получения массива документов
+        const allDocuments = cursorKLP.toArray();
 
 
-    allDocuments.then(arr => {
-        arr.forEach(doc => {
-            //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
-            docs.push(doc);
-        });}).then(r => {   //после того, как все заполнено, возвращаем KLP
+        allDocuments.then(arr => {
+            arr.forEach(doc => {
+                //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
+                docs.push(doc);
+            });
+        }).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
             console.timeEnd('get_KLP_smmnn_uuid');
         });
@@ -123,89 +187,102 @@ function get_KLP_smmnn_uuid(smnn_uid, res)
 
 
 
-function get_KLP_MNN(MNN, res)
-{
+function get_KLP_MNN(MNN, res) {
     console.time('get_KLP_MNN');
     client.connect().then(mongoClient => {
-    console.log("Подключение установлено");
+        console.log("Подключение к БД установлено");
 
-    const db = client.db("esklp_service");
-    //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
-    const col_KLP = db.collection("klp");
-    //ищем МНН по имени
-    const cursorKLP = col_KLP.find({ 'parent_MNN': MNN }).sort({'trade_name': 1, 'lf_norm_name' : 1});
+        const db = client.db("esklp_service");
+        //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
+        const col_KLP = db.collection("klp");
+        //ищем МНН по имени
+        const cursorKLP = col_KLP.find({ 'parent_MNN': MNN }).sort({ 'trade_name': 1, 'lf_norm_name': 1 });
 
-    //массив возвращаемых документов
-    let docs = [];
-    //асинхронный вызов получения массива документов
-    const allDocuments = cursorKLP.toArray();
+        //массив возвращаемых документов
+        let docs = [];
+        //асинхронный вызов получения массива документов
+        const allDocuments = cursorKLP.toArray();
 
 
-    allDocuments.then(arr => {
-        arr.forEach(doc => {
-            //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
-            docs.push(doc);
-        });}).then(r => {   //после того, как все заполнено, возвращаем KLP
+        allDocuments.then(arr => {
+            arr.forEach(doc => {
+                //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
+                docs.push(doc);
+            });
+        }).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
             console.timeEnd('get_KLP_MNN');
         });
     });
 }
 
-function get_KLP_smmnn_uuid_list(smnn_uid_list, res)
-{
+function get_KLP_smmnn_uuid_list(smnn_uid_list, res) {
     console.time('get_KLP_smmnn_uuid_list');
     client.connect().then(mongoClient => {
-    console.log("Подключение установлено");
+        console.log("Подключение к БД установлено");
 
-    const db = client.db("esklp_service");
-    //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
-    const col_KLP = db.collection("klp");
-    //ищем МНН по имени
-    const cursorKLP = col_KLP.find({ 'parent_SMNN_UUID': {$in : smnn_uid_list}}).sort({'trade_name': 1, 'lf_norm_name' : 1});
+        const db = client.db("esklp_service");
+        //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
+        const col_KLP = db.collection("klp");
+        //ищем МНН по имени
+        const cursorKLP = col_KLP.find({ 'parent_SMNN_UUID': { $in: smnn_uid_list } }).sort({ 'trade_name': 1, 'lf_norm_name': 1 });
 
-    //массив возвращаемых документов
-    let docs = [];
-    //асинхронный вызов получения массива документов
-    const allDocuments = cursorKLP.toArray();
+        //массив возвращаемых документов
+        let docs = [];
+        //асинхронный вызов получения массива документов
+        const allDocuments = cursorKLP.toArray();
 
 
-    allDocuments.then(arr => {
-        arr.forEach(doc => {
-            //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
-            docs.push(doc);
-        });}).then(r => {   //после того, как все заполнено, возвращаем KLP
+        allDocuments.then(arr => {
+            arr.forEach(doc => {
+                //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
+                docs.push(doc);
+            });
+        }).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
             console.timeEnd('get_KLP_smmnn_uuid_list');
         });
     });
 }
 
-function get_KLP_uuid_list(klp_uid_list, res)
-{
+function get_KLP_uuid_list(klp_uid_list, params, res) {
     console.time('get_KLP_uuid_list');
     client.connect().then(mongoClient => {
-    console.log("Подключение установлено");
+        console.log("Подключение к БД установлено");
 
-    const db = client.db("esklp_service");
-    //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
-    const col_KLP = db.collection("klp");
-    //ищем МНН по имени
+        const db = client.db("esklp_service");
+        //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
+        const col_KLP = db.collection("klp");
+        //ищем МНН по имени
 
-    
-    const cursorKLP = col_KLP.find({ 'attr_UUID': {$in : klp_uid_list}}).sort({'trade_name': 1, 'lf_norm_name' : 1,'dosage_norm_name' : 1, 'consumer_total' : 1});
+        userQuery = { 'attr_UUID': { $in: klp_uid_list } };
+        if ('trade_name' in params)
+            userQuery = { $and: [userQuery, { "trade_name": params.trade_name }] };
+        if ('dosage' in params)
+            userQuery = { $and: [userQuery, { "dosage_norm_name": params.dosage }] };
+        if ('lek_form' in params)
+            userQuery = { $and: [userQuery, { "lf_norm_name": params.lek_form }] };
+        if ('pack_1_name' in params)
+            userQuery = { $and: [userQuery, { "pack_1.name": params.pack_1_name }] };
+        if ('manufacturer' in params)
+            userQuery = { $and: [userQuery, { "manufacturer.name": params.manufacturer }] };
 
-    //массив возвращаемых документов
-    let docs = [];
-    //асинхронный вызов получения массива документов
-    const allDocuments = cursorKLP.toArray();
+        console.log('query = ' + JSON.stringify(userQuery));
+
+        const cursorKLP = col_KLP.find(userQuery).sort({ 'trade_name': 1, 'lf_norm_name': 1, 'dosage_norm_name': 1, 'consumer_total': 1 });
+
+        //массив возвращаемых документов
+        let docs = [];
+        //асинхронный вызов получения массива документов
+        const allDocuments = cursorKLP.toArray();
 
 
-    allDocuments.then(arr => {
-        arr.forEach(doc => {
-            //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
-            docs.push(doc);
-        });}).then(r => {   //после того, как все заполнено, возвращаем KLP
+        allDocuments.then(arr => {
+            arr.forEach(doc => {
+                //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
+                docs.push(doc);
+            });
+        }).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
             console.timeEnd('get_KLP_uuid_list');
         });
@@ -216,28 +293,60 @@ function get_KLP_uuid_list(klp_uid_list, res)
 
 
 
-
-
-app.get('/smnn_by_name/:exact/:with_klp/:only_actual/:name', function(req, res) {
+app.get('/smnn_by_name/:exact/:with_klp/:only_actual/:name', function (req, res) {
     const name = req.params.name;
     exact = req.params.exact == "1";
     with_klp = req.params.with_klp == "1";
     only_actual = req.params.only_actual == "1";
 
     userQuery = {};
-    if ('trade_name' in req.query)
-        userQuery =  {$and : [userQuery, {"klp_list.TradeNames" : req.query.trade_name}]};
-    if ('dosage' in req.query)
-        userQuery =  {$and : [userQuery, {"klp_list.Dosages" : req.query.dosage}]};
-    if ('lek_form' in req.query)
-        userQuery =  {$and : [userQuery, {"klp_list.LekForms" : req.query.lek_form}]};
-    if ('pack_1_name' in req.query)
-        userQuery =  {$and : [userQuery, {"klp_list.Pack1s" : req.query.pack_1_name}]};
-    if ('manufacturer' in req.query)
-        userQuery =  {$and : [userQuery, {"klp_list.Manufacturers" : req.query.manufacturer}]};
-    
-    get_SMNN(name, only_actual,exact, with_klp, userQuery, res);
-}); 
+    /* if ('trade_name' in req.query)
+         userQuery =  {$and : [userQuery, {"klp_list.LekPreps.trade_name" : req.query.trade_name}]};
+     if ('dosage' in req.query)
+         userQuery =  {$and : [userQuery, {"klp_list.LekPreps.dosage_norm_name" : req.query.dosage}]};
+     if ('lek_form' in req.query)
+         userQuery =  {$and : [userQuery, {"klp_list.LekPreps.lf_norm_name" : req.query.lek_form}]};
+     if ('pack_1_name' in req.query)
+         userQuery =  {$and : [userQuery, {"klp_list.LekPreps.pack1_name" : req.query.pack_1_name}]};
+     if ('manufacturer' in req.query)
+         userQuery =  {$and : [userQuery, {"klp_list.LekPreps.manufacturer_name" : req.query.manufacturer}]};**/
+
+    get_SMNN(name, only_actual, exact, with_klp, userQuery, res);
+});
+
+
+
+app.post('/lp_by_name', function (req, res) {
+
+    /*  const name = req.params.mnn;
+      exact = req.params.exact == "1";
+      only_actual = req.params.only_actual == "1";*/
+
+    /* userQuery = {};
+     if ('trade_name' in req.query)
+         userQuery = { $and: [userQuery, { "trade_name": req.query.trade_name }] };
+     if ('dosage' in req.query)
+         userQuery = { $and: [userQuery, { "dosage_norm_name": req.query.dosage }] };
+     if ('lek_form' in req.query)
+         userQuery = { $and: [userQuery, { "lf_norm_name": req.query.lek_form }] };
+     if ('pack_1_name' in req.query)
+         userQuery = { $and: [userQuery, { "pack1_name": req.query.pack_1_name }] };
+     if ('manufacturer' in req.query)
+         userQuery = { $and: [userQuery, { "manufacturer_name": req.query.manufacturer }] };*/
+
+    const klp_uid_list = req.body;
+    let body = '';
+    req.on('data', chunk => {
+        body += chunk.toString();
+    });
+    req.on('end', () => {
+        req_body = JSON.parse(body);
+        get_LP(req_body.params, res);
+        // get_KLP_uuid_list(req_body.klp_uid_list, req_body.params, res);
+    });
+
+
+});
 
 
 /*
@@ -256,37 +365,38 @@ app.get('/mnn_by_name_like_with_klp/:pattern', function(req, res) {
     get_MNN(name, false, res, true);
  });  */
 
- app.get('/klp_by_smnn_uuid/:smnn_uid', function(req, res) {
+app.get('/klp_by_smnn_uuid/:smnn_uid', function (req, res) {
     const smnn_uid = req.params.smnn_uid;
     get_KLP_smmnn_uuid(smnn_uid, res);
- }); 
- 
- app.get('/klp_by_smnn_uuid_list/:smnn_uid_list', function(req, res) {
+});
+
+app.get('/klp_by_smnn_uuid_list/:smnn_uid_list', function (req, res) {
     const smnn_uid_list_str = req.params.smnn_uid_list;
     get_KLP_smmnn_uuid_list(smnn_uid_list_str.split(","), res);
- });
+});
 
 
- const urlencodedParser = bodyParser.urlencoded({extended: false});
+const urlencodedParser = bodyParser.urlencoded({ extended: false });
 
- app.post('/klp_by_uuid_list',  function(req, res) {
+app.post('/klp_by_uuid_list', function (req, res) {
     const klp_uid_list = req.body;
     let body = '';
     req.on('data', chunk => {
         body += chunk.toString();
     });
     req.on('end', () => {
-        get_KLP_uuid_list(body.split(","), res);
+        req_body = JSON.parse(body);
+        get_KLP_uuid_list(req_body.klp_uid_list, req_body.params, res);
     });
-    
- });
- 
- app.get('/klp_by_mnn/:mnn', function(req, res) {
+
+});
+
+app.get('/klp_by_mnn/:mnn', function (req, res) {
     const mnn = req.params.mnn;
     get_KLP_MNN(mnn, res);
- });
-    
- 
+});
+
+
 /*const bodyParser = require('body-parser');
 // после инициализации const app
  app.use(bodyParser.urlencoded({ extended: true}));
@@ -304,7 +414,7 @@ app.get('/mnn_by_name_like_with_klp/:pattern', function(req, res) {
     return res.send(posts);
 });*/
 
-app.listen(port,()=>{
-	console.log(`Server run on ${port} port`)
+app.listen(port, () => {
+    console.log(`Server run on ${port} port`)
 });
 
