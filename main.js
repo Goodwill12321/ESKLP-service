@@ -140,7 +140,8 @@ function get_LP(params, res) {
                 query = { $and: [query, { "manufacturer_name": params.manufacturer}] };
             else
                 query = { $and: [query, { "manufacturer_name": { $regex: params.manufacturer, $options: "i" } }] };
-           
+        if ('num_reg' in params)
+            query = { $and: [query, { "num_reg": params.num_reg }] };           
 
         console.log('query = ' + JSON.stringify(query));
 
@@ -287,6 +288,13 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
             userQuery = { $and: [userQuery, { "lf_norm_name": params.lek_form }] };
         if ('pack_1_name' in params)
             userQuery = { $and: [userQuery, { "pack_1.name": params.pack_1_name }] };
+        if ('num_reg' in params)
+            userQuery = { $and: [userQuery, { "num_reg": params.num_reg }] };
+        if ('lim_price' in params)
+            userQuery = { $and: [userQuery, { "klp_lim_price_list.children.price_value": params.lim_price }] };
+        if ('barcode' in params)
+            userQuery = { $and: [userQuery, { "klp_lim_price_list.children.barcode": params.barcode }] };
+        
         
         if ('manufacturer' in params)
             if (params.exactly)
@@ -316,6 +324,75 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
     });
 }
 
+
+function get_KLP_by_price(trade_name, params, res) {
+    console.time('get_KLP_uuid_list');
+    client.connect().then(mongoClient => {
+        console.log("Подключение к БД установлено");
+
+        const db = client.db("esklp_service");
+        //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
+        const col_KLP = db.collection("klp");
+        //ищем МНН по имени
+
+        userQuery = { 'trade_name': trade_name };
+
+        if ('num_reg' in params)
+            userQuery = { $and: [userQuery, { "num_reg": params.num_reg }] };
+        if ('lim_price' in params)
+            userQuery = { $and: [userQuery, { "klp_lim_price_list.children.price_value": params.lim_price }] };
+        if ('barcode' in params)
+            userQuery = { $and: [userQuery, { "klp_lim_price_list.children.barcode": params.barcode }] };
+        
+        
+        if ('manufacturer' in params)
+            if (params.exactly)
+                userQuery = { $and: [userQuery, { "manufacturer.name": params.manufacturer}] };
+            else
+                userQuery = { $and: [userQuery, { "manufacturer.name": { $regex: params.manufacturer, $options: "i" } }] };
+        
+       
+        // const cursorKLP = col_KLP.find(userQuery).sort({ 'trade_name': 1, 'lf_norm_name': 1, 'dosage_norm_name': 1, 'consumer_total': 1 });
+        query = [
+            {
+            $match: 
+                userQuery
+            },
+            {
+            $lookup: {
+                from: 'smnn',
+                localField: 'parent_SMNN_UUID',
+                foreignField: 'attr_UUID',
+                as: 'smnn_parent'
+            }
+            },
+            { $unwind: { path: '$smnn_parent' } }
+        ];
+
+        console.log('query = ' + JSON.stringify(query));
+
+        const cursorKLP = col_KLP.aggregate(query
+                ,
+            { //maxTimeMS: 60000, allowDiskUse: true 
+            }
+          ).sort({ 'trade_name': 1, 'lf_norm_name': 1, 'dosage_norm_name': 1, 'consumer_total': 1 });;
+        //массив возвращаемых документов
+        let docs = [];
+        //асинхронный вызов получения массива документов
+        const allDocuments = cursorKLP.toArray();
+
+
+        allDocuments.then(arr => {
+            arr.forEach(doc => {
+                //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
+                docs.push(doc);
+            });
+        }).then(r => {   //после того, как все заполнено, возвращаем KLP
+            res.send(docs);
+            console.timeEnd('get_KLP_uuid_list');
+        });
+    });
+}
 
 
 
@@ -406,7 +483,6 @@ app.get('/klp_by_smnn_uuid_list/:smnn_uid_list', function (req, res) {
 const urlencodedParser = bodyParser.urlencoded({ extended: false });
 
 app.post('/klp_by_uuid_list', function (req, res) {
-    const klp_uid_list = req.body;
     let body = '';
     req.on('data', chunk => {
         body += chunk.toString();
@@ -415,8 +491,20 @@ app.post('/klp_by_uuid_list', function (req, res) {
         req_body = JSON.parse(body);
         get_KLP_uuid_list(req_body.klp_uid_list, req_body.params, res);
     });
-
 });
+
+
+app.post('/klp_by_lim_price', function (req, res) {
+    let body = '';
+    req.on('data', chunk => {
+        body += chunk.toString();
+    });
+    req.on('end', () => {
+        req_body = JSON.parse(body);
+        get_KLP_by_price(req_body.trade_name, req_body.params, res);
+    });
+});
+
 
 app.get('/klp_by_mnn/:mnn', function (req, res) {
     const mnn = req.params.mnn;
