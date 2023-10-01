@@ -145,7 +145,7 @@ function get_LP(params, res) {
 
         console.log('query = ' + JSON.stringify(query));
 
-        cursor = col_LP.find(query).sort({ 'mnn': 1, 'trade_name': 1, 'lf_norm_name': 1, 'lf_norm_name': 1, 'dosage_norm_name': 1 }).collation({ locale: 'ru', strength: 1 });
+        cursor = col_LP.find(query).sort({ 'mnn': 1, 'trade_name': 1, 'date_change': -1, 'lf_norm_name': 1, 'dosage_norm_name': 1 }).collation({ locale: 'ru', strength: 1 });
 
         //массив возвращаемых документов
         let docs = [];

@@ -112,6 +112,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
           LekPrep.parent_SMNN_UUID = SMNN_UUID;
           LekPrep.mnn = MNN;
           LekPrep.trade_name = clChild.trade_name;
+          LekPrep.date_change = clChild.date_change;
           LekPrep.num_reg = clChild.num_reg;
           LekPrep.date_reg = clChild.date_reg;
           try {
