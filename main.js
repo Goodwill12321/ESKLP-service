@@ -130,11 +130,20 @@ function get_LP(params, res) {
             else
                 query = { $and: [query, { "trade_name": { $regex: params.trade_name, $options: "i" }  }] };
         if ('dosage' in params)
-            query = { $and: [query, { "dosage_norm_name": params.dosage }] };
+            if (params.exactly)
+                query = { $and: [query, { "dosage_norm_name": params.dosage }] };
+            else
+                query = { $and: [query, { "dosage_norm_name": { $regex: params.dosage, $options: "i" }  }] };
         if ('lek_form' in params)
-            query = { $and: [query, { "lf_norm_name": params.lek_form }] };
+            if (params.exactly)
+                query = { $and: [query, { "lf_norm_name": params.lek_form }] };
+            else
+                query = { $and: [query, { "lf_norm_name": { $regex: params.lek_form, $options: "i" }  }] };
         if ('pack_1_name' in params)
-            query = { $and: [query, { "pack1_name": params.pack_1_name }] };
+            if (params.exactly)
+                query = { $and: [query, { "pack1_name": params.pack_1_name }] };
+            else
+                query = { $and: [query, { "pack1_name": { $regex: params.pack_1_name, $options: "i" }  }] };    
         if ('manufacturer' in params)
             if (params.exactly)
                 query = { $and: [query, { "manufacturer_name": params.manufacturer}] };
@@ -144,27 +153,48 @@ function get_LP(params, res) {
             query = { $and: [query, { "num_reg": params.num_reg }] };           
 
         console.log('query = ' + JSON.stringify(query));
+        
+        distinct = false;
+        if ('distinct' in params)
+        {
+            distinct = true;
+            distinct_fields = params.distinct;
+        }
+
 
         cursor = col_LP.find(query).sort({ 'mnn': 1, 'trade_name': 1, 'date_change': -1, 'lf_norm_name': 1, 'dosage_norm_name': 1 }).collation({ locale: 'ru', strength: 1 });
 
+        
         //массив возвращаемых документов
         let docs = [];
         //асинхронный вызов получения массива документов
         const allDocuments = cursor.toArray();
 
-        //соответствие СМНН - узла массива СМНН по его UUID, чтобы обработать в конечном then после обработки массивов КЛП и добавить подчиненный элемент
-        let smnn_uuid = {};
-
+       
         allDocuments.then(arr => {
+            res_doc = {};
+            if (distinct)
+                docs.push(res_doc);
+            for(field of distinct_fields)
+                res_doc[field] = [];
             arr.forEach(doc => {
-                console.log(doc);
                 //добавляем в коллекцию документ МНН
-                docs.push(doc);
+                if (distinct)
+                {
+                    for(field of distinct_fields)
+                        if (res_doc[field].indexOf(doc[field]) == -1)
+                            res_doc[field].push(doc[field]);
+                }
+                else
+                {
+                    console.log(doc);
+                    docs.push(doc);
+                }
+
             });
 
             //ждем все обработки всех массивов. promises - это массив промисов, каждый из которых возвращает массив КЛП. 
             // Т.е. результатом ожидания будет массив массивов arraysKLP
-
             res.send(docs);
             console.timeEnd('get_LP');
         });
@@ -283,11 +313,22 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
                 userQuery = { $and: [userQuery, { "trade_name": { $regex: params.trade_name, $options: "i" }  }] };
 
         if ('dosage' in params)
-            userQuery = { $and: [userQuery, { "dosage_norm_name": params.dosage }] };
+            if (params.exactly)
+                query = { $and: [userQuery, { "dosage_norm_name": params.dosage }] };
+            else
+                query = { $and: [userQuery, { "dosage_norm_name": { $regex: params.dosage, $options: "i" }  }] };
         if ('lek_form' in params)
-            userQuery = { $and: [userQuery, { "lf_norm_name": params.lek_form }] };
+            if (params.exactly)
+                query = { $and: [userQuery, { "lf_norm_name": params.lek_form }] };
+            else
+                query = { $and: [userQuery, { "lf_norm_name": { $regex: params.lek_form, $options: "i" }  }] };
+            //userQuery = { $and: [userQuery, { "lf_norm_name": params.lek_form }] };
         if ('pack_1_name' in params)
-            userQuery = { $and: [userQuery, { "pack_1.name": params.pack_1_name }] };
+            if (params.exactly)
+                query = { $and: [userQuery, { "pack_1.name": params.pack_1_name }] };
+            else
+                query = { $and: [userQuery, { "pack_1.name": { $regex: params.pack_1_name, $options: "i" }  }] };    
+            //userQuery = { $and: [userQuery, { "pack_1.name": params.pack_1_name }] };
         if ('num_reg' in params)
             userQuery = { $and: [userQuery, { "num_reg": params.num_reg }] };
         if ('lim_price' in params)
