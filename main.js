@@ -33,7 +33,10 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
             query_name = { 'mnn': { $regex: name, $options: "i" } };
 
         if (only_actual)
-            query = { $and: [query_name, { "date_end": { $exists: false } }] };
+        {
+            date_end_cond = {$or: [ { "date_end_dt": {$gt : new Date()}, "date_end": { $exists: false } }]};
+            query = { $and: [query_name, date_end_cond] };
+        }    
         else
             query = query_name;
 
@@ -112,10 +115,13 @@ function get_LP(params, res) {
         }    
 
         if (params.only_actual)
+        {
+            date_end_cond = {$or: [ { "date_end_dt": {$gt : new Date()}, "date_end": { $exists: false } }]};
             if(Object.keys(query_name).length !== 0)
-                query = { $and: [query_name, { "date_end": { $exists: false } }] };
+                query = { $and: [query_name, date_end_cond] };
             else
-                query = { "date_end": { $exists: false } };
+                query = date_end_cond;
+        }    
         else
             query = query_name;
 
@@ -174,9 +180,11 @@ function get_LP(params, res) {
         allDocuments.then(arr => {
             res_doc = {};
             if (distinct)
+            {
                 docs.push(res_doc);
-            for(field of distinct_fields)
-                res_doc[field] = [];
+                for(field of distinct_fields)
+                    res_doc[field] = [];
+            }    
             arr.forEach(doc => {
                 //добавляем в коллекцию документ МНН
                 if (distinct)
