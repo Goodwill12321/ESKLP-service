@@ -384,7 +384,10 @@ function get_KLP_by_price(trade_name, params, res) {
         const col_KLP = db.collection("klp");
         //ищем МНН по имени
 
-        userQuery = { 'trade_name': trade_name };
+        if (trade_name != '')
+            userQuery = { 'trade_name': { $regex: trade_name, $options : "i" } };
+        else
+            userQuery = { 'trade_name': {$ne: ""} }
 
         if ('num_reg' in params)
             userQuery = { $and: [userQuery, { "num_reg": params.num_reg }] };
