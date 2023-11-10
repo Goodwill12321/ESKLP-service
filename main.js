@@ -93,6 +93,10 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
 }
 
 
+function regExpEscape(literal_string) {
+    return literal_string.replace(/[-[\]{}()*+!<=:?.\/\\^$|#\s,]/g, '\\$&');
+}
+
 
 function get_LP(params, res) {
     console.time('get_LP');
@@ -135,11 +139,13 @@ function get_LP(params, res) {
                 query = { $and: [query, { "trade_name": params.trade_name }] };
             else
                 query = { $and: [query, { "trade_name": { $regex: params.trade_name, $options: "i" }  }] };
+        
         if ('dosage' in params)
             if (params.exactly)
-                query = { $and: [query, { "dosage_norm_name": params.dosage }] };
+                query = {$and :[query, { $or: [{ "dosage_norm_name": params.dosage }, { "dosage_unit_name": params.dosage }] }]};
             else
-                query = { $and: [query, { "dosage_norm_name": { $regex: params.dosage, $options: "i" }  }] };
+                query = { $and: [query, { $or: [{ "dosage_norm_name": { $regex: regExpEscape(params.dosage), $options: "i" }  }, { "dosage_unit_name": { $regex: regExpEscape(params.dosage), $options: "i" }  }] }]};
+        
         if ('lek_form' in params)
             if (params.exactly)
                 query = { $and: [query, { "lf_norm_name": params.lek_form }] };

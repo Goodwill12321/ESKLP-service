@@ -133,9 +133,12 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
           // LekPrep.limPriceList = [];
 
           LekPrep.dosage_norm_name = clChild.dosage_norm_name;
-          LekPrep.dosage_num = clone_parent.dosage.dosage_num;
-          LekPrep.dosage_okei_name = clone_parent.dosage.dosage_unit.okei_name;
-          LekPrep.dosage_okei_code = clone_parent.dosage.dosage_unit.okei_code;
+          LekPrep.dosage_num =            clone_parent.dosage.dosage_num;
+          LekPrep.dosage_grls_value =     clone_parent.dosage.grls_value;
+          LekPrep.dosage_unit_name =      clone_parent.dosage.dosage_unit.name;
+          LekPrep.dosage_okei_name =      clone_parent.dosage.dosage_unit.okei_name;
+          LekPrep.dosage_okei_code =      clone_parent.dosage.dosage_unit.okei_code;
+          LekPrep.dosage_user_name =      clone_parent.dosage.dosage_user.name;
           LekPrep.dosage_user_okei_name = clone_parent.dosage.dosage_user.okei_name;
           LekPrep.dosage_user_okei_code = clone_parent.dosage.dosage_user.okei_code;
           LekPrep.ftg = clone_parent.ftg;
