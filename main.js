@@ -106,6 +106,7 @@ function get_LP(params, res) {
     client.connect().then(mongoClient => {
         curDate = new Date();
         console.log("******************************");
+        console.log("get_LP");
         console.log(curDate + ". Подключение к БД установлено");
         console.log("------------------------------");
       
@@ -321,7 +322,9 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
     console.time('get_KLP_uuid_list.' + uuid);
     client.connect().then(mongoClient => {
         curDate = new Date();
+        
         console.log("******************************");
+        console.log("get_KLP_uuid_list");
         console.log(curDate + ". Подключение к БД установлено");
         console.log("------------------------------");
         const db = client.db("esklp_service");
@@ -401,6 +404,7 @@ function get_KLP_by_price(trade_name, params, res) {
     client.connect().then(mongoClient => {
         curDate = new Date();
         console.log("******************************");
+        console.log("get_KLP_by_price");
         console.log(curDate + ". Подключение к БД установлено");
         console.log("------------------------------");
         
@@ -443,7 +447,14 @@ function get_KLP_by_price(trade_name, params, res) {
                 as: 'smnn_parent'
             }
             },
-            { $unwind: { path: '$smnn_parent' } }
+            { $unwind: { path: '$smnn_parent' } },
+            {
+                $project: {
+                  "smnn_parent.parent": 0,
+                  "smnn_parent.klp_list": 0,
+                  "smnn_replace_list" : 0
+                }
+            } 
         ];
 
         console.log('query = ' + JSON.stringify(query));

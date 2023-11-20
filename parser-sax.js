@@ -396,7 +396,7 @@ function loadFile(filePath) {
       collection_new.drop().then(result => {
         console.info(collectionNameNew +" dropped");
         collection_old.rename(collectionNameNew).then(result => {
-          console.info(collectionNameNew + " renamed");
+          console.info(collectionNameOld + " renamed to " + collectionNameNew);
         },
           err => {
             console.error("Err rename coll " + collectionNameNew + " : " + err);
