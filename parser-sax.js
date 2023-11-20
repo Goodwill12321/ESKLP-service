@@ -99,7 +99,9 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
 
         for (let child of tag.children) {
           let clChild = cloneTag(child, 100, true, 1); //клонируем КЛП 
-
+          if (clChild.code == "21.10.51.121-000003-1-00167-2000001178496")
+            console.log("Found! " + clChild.code) 
+          
           clChild.parent_MNN_UUID = MNN_UUID; //проставялем внешние ключи  - это самый высокий уровень МНН
           clChild.parent_MNN = MNN; //проставялем внешние ключи  - это самый высокий уровень МНН (наименование)
           clChild.parent_SMNN_UUID = SMNN_UUID; //это подчиненный СМНН
@@ -274,12 +276,30 @@ function loadFile(filePath) {
     let lpList = [];
 
     const db = client.db("esklp_service");
-    const collectionMNN = db.collection("mnn");
-    const collectionSMNN = db.collection("smnn");
-    const collectionLP = db.collection("lp");
-    const collectionKLP = db.collection("klp");
+    const collectionMNN = db.collection("mnn_load");
+    collectionMNN.deleteMany({});
+    const collectionSMNN = db.collection("smnn_load");
+    collectionSMNN.deleteMany({});
+    const collectionLP = db.collection("lp_load");
+   
+    collectionLP.createIndex({"manufacturer_name" : 1}); 
+    collectionLP.createIndex({"mnn" : 1}); 
+    collectionLP.createIndex({"num_reg" : 1}); 
+    collectionLP.createIndex({"trade_name" : 1}); 
+   
+    const collectionKLP = db.collection("klp_load");
+    collectionKLP.deleteMany({});
+    collectionKLP.createIndex({"attr_UUID" : 1});
+    collectionKLP.createIndex({"klp_lim_price_list.children.price_value" : 1});
+    collectionKLP.createIndex({"num_reg" : 1}).catch((error) => {
+             console.error(error);
+            });
+    collectionKLP.createIndex({"parent_SMNN_UUID" : 1}).catch((error) => {
+      console.error(error);
+     });;
+ 
 
-
+    
     let batchTemp = [];
 
     function saveDataBatch(data) {
@@ -297,45 +317,55 @@ function loadFile(filePath) {
             console.log("Duplicate object " + data);
           else {
             batchTemp.push(data);
-            collectionMNN.insertMany(batchTemp).then(result => {
-              //console.log(data);
-              console.info("➕  " + ins + " all " + cnt_all);
-              //xml.resume()
-            },
-              err => {
-                console.log(data);
-                Errors.push(err);
-                //xml.resume();
-              });
-            batchTemp = [];
-            collectionSMNN.insertMany(smnnList).then(result => {
-              console.info("smnn");
-            },
-              err => {
-                console.log(err);
-                Errors.push(err);
-              });
-            smnnList = [];
-
-            collectionLP.insertMany(lpList).then(result => {
-              console.info("lp");
-            },
-              err => {
-                console.log(err);
-                Errors.push(err);
-              });
-            lpList = [];
-            collectionKLP.insertMany(klpList).then(result => {
-              console.info("klp");
-            },
-              err => {
-                console.log(err);
-                Errors.push(err);
-              });
-            klpList = [];
+            saveToDB();
+           // renameCollections();
+    
           }
         }
       }
+    }
+
+
+    function saveToDB(last_save = false)
+    {
+      collectionMNN.insertMany(batchTemp).then(result => {
+        //console.log(data);
+        console.info("➕  " + ins + " all " + cnt_all);
+        //xml.resume()
+      },
+        err => {
+          console.log(data);
+          Errors.push(err);
+          //xml.resume();
+        });
+      batchTemp = [];
+      collectionSMNN.insertMany(smnnList).then(result => {
+        console.info("smnn");
+      },
+        err => {
+          console.log(err);
+          Errors.push(err);
+        });
+      smnnList = [];
+
+      collectionLP.insertMany(lpList).then(result => {
+        console.info("lp");
+      },
+        err => {
+          console.log(err);
+          Errors.push(err);
+        });
+      lpList = [];
+      collectionKLP.insertMany(klpList).then(result => {
+        console.info("klp");
+        if(last_save)
+          renameCollections();
+      },
+        err => {
+          console.log(err);
+          Errors.push(err);
+        });
+      klpList = [];
     }
 
     console.log("Current directory:", __dirname);
@@ -358,6 +388,34 @@ function loadFile(filePath) {
 
     const tagCollect = "NS2:GROUP";
 
+    function renameCollection(collectionNameOld, collectionNameNew)
+    {
+      const collection_old = db.collection(collectionNameOld);
+      const collection_new = db.collection(collectionNameNew);
+    
+      collection_new.drop().then(result => {
+        console.info(collectionNameNew +" dropped");
+        collection_old.rename(collectionNameNew).then(result => {
+          console.info(collectionNameNew + " renamed");
+        },
+          err => {
+            console.error("Err rename coll " + collectionNameNew + " : " + err);
+            Errors.push(err);
+          });
+      },
+        err => {
+          console.error("Err drop coll " + collectionNameNew + " : " + err);
+          Errors.push(err);
+        });
+    }
+
+    function renameCollections()
+    {
+      renameCollection("mnn_load", "mnn");
+      renameCollection("smnn_load", "smnn");
+      renameCollection("lp_load", "lp");
+      renameCollection("klp_load", "klp");
+    }
 
     cur_ch = undefined
     product = undefined
@@ -404,8 +462,13 @@ function loadFile(filePath) {
     });
 
     saxStream.on("end", function () {
+      if (batchTemp && batchTemp.length > 0) {
+        saveToDB(true);
+      }
       console.log("finished document!");
       console.timeEnd('parse');
+      
+     
     });
 
     console.time('parse');

@@ -1,5 +1,6 @@
 const express = require('express')
 const bodyParser = require('body-parser')
+const { v4: uuidv4 } = require('uuid');
 
 const app = express()
 app.use(express.urlencoded({ extended: false }))
@@ -99,10 +100,15 @@ function regExpEscape(literal_string) {
 
 
 function get_LP(params, res) {
-    console.time('get_LP');
-    client.connect().then(mongoClient => {
-        console.log("Подключение к БД установлено");
+    uuid = uuidv4();
+    console.time('get_LP.' + uuid);
 
+    client.connect().then(mongoClient => {
+        curDate = new Date();
+        console.log("******************************");
+        console.log(curDate + ". Подключение к БД установлено");
+        console.log("------------------------------");
+      
         const db = client.db("esklp_service");
         //коллекция МНН
         const col_LP = db.collection("lp");
@@ -201,7 +207,7 @@ function get_LP(params, res) {
                 }
                 else
                 {
-                    console.log(doc);
+                   // console.log(doc);
                     docs.push(doc);
                 }
 
@@ -209,8 +215,11 @@ function get_LP(params, res) {
 
             //ждем все обработки всех массивов. promises - это массив промисов, каждый из которых возвращает массив КЛП. 
             // Т.е. результатом ожидания будет массив массивов arraysKLP
+            console.log('get_LP.' +uuid + '. Получено ЛП ' + docs.length);
             res.send(docs);
-            console.timeEnd('get_LP');
+            console.timeEnd('get_LP.' + uuid);
+            console.log("------------------------------");
+            console.log("******************************");
         });
         ;
 
@@ -308,10 +317,13 @@ function get_KLP_smmnn_uuid_list(smnn_uid_list, res) {
 }
 
 function get_KLP_uuid_list(klp_uid_list, params, res) {
-    console.time('get_KLP_uuid_list');
+    uuid = uuidv4();
+    console.time('get_KLP_uuid_list.' + uuid);
     client.connect().then(mongoClient => {
-        console.log("Подключение к БД установлено");
-
+        curDate = new Date();
+        console.log("******************************");
+        console.log(curDate + ". Подключение к БД установлено");
+        console.log("------------------------------");
         const db = client.db("esklp_service");
         //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
         const col_KLP = db.collection("klp");
@@ -374,17 +386,24 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
             });
         }).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
-            console.timeEnd('get_KLP_uuid_list');
+            console.log('get_KLP_uuid_list.' + uuid + '. Получено КЛП по списку UUID ' + docs.length);
+            console.timeEnd('get_KLP_uuid_list.' + uuid);
+            console.log("------------------------------");
+            console.log("******************************");
         });
     });
 }
 
 
 function get_KLP_by_price(trade_name, params, res) {
-    console.time('get_KLP_uuid_list');
+    uuid = uuidv4();
+    console.time('get_KLP_by_price.' + uuid);
     client.connect().then(mongoClient => {
-        console.log("Подключение к БД установлено");
-
+        curDate = new Date();
+        console.log("******************************");
+        console.log(curDate + ". Подключение к БД установлено");
+        console.log("------------------------------");
+        
         const db = client.db("esklp_service");
         //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
         const col_KLP = db.collection("klp");
@@ -447,7 +466,10 @@ function get_KLP_by_price(trade_name, params, res) {
             });
         }).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
-            console.timeEnd('get_KLP_uuid_list');
+            console.log('get_KLP_by_price.' + uuid + '. Получено КЛП по цене ' + docs.length);
+            console.timeEnd('get_KLP_by_price.' + uuid);
+            console.log("------------------------------");
+            console.log("******************************");
         });
     });
 }
