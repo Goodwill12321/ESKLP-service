@@ -414,7 +414,7 @@ function get_KLP_by_price(trade_name, params, res) {
         //ищем МНН по имени
 
         if (trade_name != '')
-            userQuery = { 'trade_name': { $regex: trade_name, $options : "i" } };
+            userQuery = { 'trade_name': { $regex: regExpEscape(trade_name), $options : "i" } };
         else
             userQuery = { 'trade_name': {$ne: ""} }
 
