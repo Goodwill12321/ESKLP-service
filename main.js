@@ -31,7 +31,7 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
         if (exactly)
             query_name = { 'mnn': name };
         else
-            query_name = { 'mnn': { $regex: name, $options: "i" } };
+            query_name = { 'mnn': { $regex: regExpEscape(name), $options: "i" } };
 
         if (only_actual)
         {
@@ -122,7 +122,7 @@ function get_LP(params, res) {
             if (params.exactly)
                 query_name = { 'mnn': params.mnn };
             else
-                query_name = { 'mnn': { $regex: params.mnn, $options: "i" } };
+                query_name = { 'mnn': { $regex: regExpEscape(params.mnn), $options: "i" } };
         }    
 
         if (params.only_actual)
@@ -145,7 +145,7 @@ function get_LP(params, res) {
             if (params.exactly)
                 query = { $and: [query, { "trade_name": params.trade_name }] };
             else
-                query = { $and: [query, { "trade_name": { $regex: params.trade_name, $options: "i" }  }] };
+                query = { $and: [query, { "trade_name": { $regex: regExpEscape(params.trade_name), $options: "i" }  }] };
         
         if ('dosage' in params)
             if (params.exactly)
@@ -157,17 +157,17 @@ function get_LP(params, res) {
             if (params.exactly)
                 query = { $and: [query, { "lf_norm_name": params.lek_form }] };
             else
-                query = { $and: [query, { "lf_norm_name": { $regex: params.lek_form, $options: "i" }  }] };
+                query = { $and: [query, { "lf_norm_name": { $regex: regExpEscape(params.lek_form), $options: "i" }  }] };
         if ('pack_1_name' in params)
             if (params.exactly)
                 query = { $and: [query, { "pack1_name": params.pack_1_name }] };
             else
-                query = { $and: [query, { "pack1_name": { $regex: params.pack_1_name, $options: "i" }  }] };    
+                query = { $and: [query, { "pack1_name": { $regex: regExpEscape(params.pack_1_name), $options: "i" }  }] };    
         if ('manufacturer' in params)
             if (params.exactly)
                 query = { $and: [query, { "manufacturer_name": params.manufacturer}] };
             else
-                query = { $and: [query, { "manufacturer_name": { $regex: params.manufacturer, $options: "i" } }] };
+                query = { $and: [query, { "manufacturer_name": { $regex: regExpEscape(params.manufacturer), $options: "i" } }] };
         if ('num_reg' in params)
             query = { $and: [query, { "num_reg": params.num_reg }] };           
 
@@ -339,24 +339,24 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
             if (params.exactly)
                 userQuery = { $and: [userQuery, { "trade_name": params.trade_name }] };
             else
-                userQuery = { $and: [userQuery, { "trade_name": { $regex: params.trade_name, $options: "i" }  }] };
+                userQuery = { $and: [userQuery, { "trade_name": { $regex: regExpEscape(params.trade_name), $options: "i" }  }] };
 
         if ('dosage' in params)
             if (params.exactly)
                 query = { $and: [userQuery, { "dosage_norm_name": params.dosage }] };
             else
-                query = { $and: [userQuery, { "dosage_norm_name": { $regex: params.dosage, $options: "i" }  }] };
+                query = { $and: [userQuery, { "dosage_norm_name": { $regex: regExpEscape(params.dosage), $options: "i" }  }] };
         if ('lek_form' in params)
             if (params.exactly)
                 query = { $and: [userQuery, { "lf_norm_name": params.lek_form }] };
             else
-                query = { $and: [userQuery, { "lf_norm_name": { $regex: params.lek_form, $options: "i" }  }] };
+                query = { $and: [userQuery, { "lf_norm_name": { $regex: regExpEscape(params.lek_form), $options: "i" }  }] };
             //userQuery = { $and: [userQuery, { "lf_norm_name": params.lek_form }] };
         if ('pack_1_name' in params)
             if (params.exactly)
                 query = { $and: [userQuery, { "pack_1.name": params.pack_1_name }] };
             else
-                query = { $and: [userQuery, { "pack_1.name": { $regex: params.pack_1_name, $options: "i" }  }] };    
+                query = { $and: [userQuery, { "pack_1.name": { $regex: regExpEscape(params.pack_1_name), $options: "i" }  }] };    
             //userQuery = { $and: [userQuery, { "pack_1.name": params.pack_1_name }] };
         if ('num_reg' in params)
             userQuery = { $and: [userQuery, { "num_reg": params.num_reg }] };
@@ -370,7 +370,7 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
             if (params.exactly)
                 userQuery = { $and: [userQuery, { "manufacturer.name": params.manufacturer}] };
             else
-                userQuery = { $and: [userQuery, { "manufacturer.name": { $regex: params.manufacturer, $options: "i" } }] };
+                userQuery = { $and: [userQuery, { "manufacturer.name": { $regex: regExpEscape(params.manufacturer), $options: "i" } }] };
         
         console.log('query = ' + JSON.stringify(userQuery));
 
@@ -430,7 +430,7 @@ function get_KLP_by_price(trade_name, params, res) {
             if (params.exactly)
                 userQuery = { $and: [userQuery, { "manufacturer.name": params.manufacturer}] };
             else
-                userQuery = { $and: [userQuery, { "manufacturer.name": { $regex: params.manufacturer, $options: "i" } }] };
+                userQuery = { $and: [userQuery, { "manufacturer.name": { $regex: regExpEscape(params.manufacturer), $options: "i" } }] };
         
        
         // const cursorKLP = col_KLP.find(userQuery).sort({ 'trade_name': 1, 'lf_norm_name': 1, 'dosage_norm_name': 1, 'consumer_total': 1 });
