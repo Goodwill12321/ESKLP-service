@@ -2,6 +2,8 @@ const { match } = require("assert");
 const { v4: uuidv4 } = require('uuid');
 
 
+const logging = require('./logger.js');
+
 let ins = 0;
 let cnt_all = 0;
 
@@ -99,14 +101,14 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
 
         for (let child of tag.children) {
           let clChild = cloneTag(child, 100, true, 1); //клонируем КЛП 
-          if (clChild.code == "21.10.51.121-000003-1-00167-2000001178496")
-            console.log("Found! " + clChild.code) 
-          
+          /*if (clChild.code == "21.10.51.121-000003-1-00167-2000001178496")
+            logging('parser',"Found! " + clChild.code) */
+
           clChild.parent_MNN_UUID = MNN_UUID; //проставялем внешние ключи  - это самый высокий уровень МНН
           clChild.parent_MNN = MNN; //проставялем внешние ключи  - это самый высокий уровень МНН (наименование)
           clChild.parent_SMNN_UUID = SMNN_UUID; //это подчиненный СМНН
           clChild.parent_SMNN_code = clone_parent.code; //это подчиненный СМНН
-  
+
           klpList.push(clChild);
           clone.children.push(clChild.attr_UUID); //в оригинальный элемент запоминаем только UUID KLP
 
@@ -135,12 +137,12 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
           // LekPrep.limPriceList = [];
 
           LekPrep.dosage_norm_name = clChild.dosage_norm_name;
-          LekPrep.dosage_num =            clone_parent.dosage.dosage_num;
-          LekPrep.dosage_grls_value =     clone_parent.dosage.grls_value;
-          LekPrep.dosage_unit_name =      clone_parent.dosage.dosage_unit.name;
-          LekPrep.dosage_okei_name =      clone_parent.dosage.dosage_unit.okei_name;
-          LekPrep.dosage_okei_code =      clone_parent.dosage.dosage_unit.okei_code;
-          LekPrep.dosage_user_name =      clone_parent.dosage.dosage_user.name;
+          LekPrep.dosage_num = clone_parent.dosage.dosage_num;
+          LekPrep.dosage_grls_value = clone_parent.dosage.grls_value;
+          LekPrep.dosage_unit_name = clone_parent.dosage.dosage_unit.name;
+          LekPrep.dosage_okei_name = clone_parent.dosage.dosage_unit.okei_name;
+          LekPrep.dosage_okei_code = clone_parent.dosage.dosage_unit.okei_code;
+          LekPrep.dosage_user_name = clone_parent.dosage.dosage_user.name;
           LekPrep.dosage_user_okei_name = clone_parent.dosage.dosage_user.okei_name;
           LekPrep.dosage_user_okei_code = clone_parent.dosage.dosage_user.okei_code;
           LekPrep.ftg = clone_parent.ftg;
@@ -183,11 +185,10 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
               limprc.date_end = lim_price.date_end;
             }*/
 
-          if (!isLPExist)
-          { 
+          if (!isLPExist) {
             LekPrep.UUID = uuidv4();
             lpList.push(LekPrep);
-          }  
+          }
         }
       }
       else if (tag.children.length == 1 //если ребенок один, его можно перенести в реквизит родителя (кроме списков)
@@ -249,242 +250,256 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
   return clone;
 }
 
+let Errors = [];
+products = [];
+let klpList = [];
+let smnnList = [];
+let lpList = [];
+
+
+const MongoClient = require("mongodb").MongoClient;
+
+const client = new MongoClient("mongodb://127.0.0.1:27017");
+
+let db = undefined;
+let collectionMNN = undefined;
+let collectionSMNN = undefined;
+let collectionLP = undefined;
+let collectionKLP = undefined;
+
+//logging('parser',mongoClient.options.dbName); // получаем имя базы данных
+//logging('parser',"Connected successfully to server");
 
 
 
+async function loadFile(filePath, endOfLoadCallback = undefined) {
 
-function loadFile(filePath) {
-
-  const MongoClient = require("mongodb").MongoClient;
   const fs = require("fs");
 
+  mongoClient = await client.connect();
+  logging('parser', "Подключение установлено");
 
+  try {
+    db = client.db("esklp_service");
+    collectionMNN = db.collection("mnn_load");
+    collectionSMNN = db.collection("smnn_load");
+    collectionLP = db.collection("lp_load");
+    collectionKLP = db.collection("klp_load");
 
-  const client = new MongoClient("mongodb://127.0.0.1:27017");
-
-
-  client.connect().then((mongoClient => {
-    console.log("Подключение установлено");
-    //console.log(mongoClient.options.dbName); // получаем имя базы данных
-    //console.log("Connected successfully to server");
-
-
-    let Errors = [];
-    products = [];
-    let klpList = [];
-    let smnnList = [];
-    let lpList = [];
-
-    const db = client.db("esklp_service");
-    const collectionMNN = db.collection("mnn_load");
     collectionMNN.deleteMany({});
-    const collectionSMNN = db.collection("smnn_load");
     collectionSMNN.deleteMany({});
-    const collectionLP = db.collection("lp_load");
-   
-    collectionLP.createIndex({"manufacturer_name" : 1}); 
-    collectionLP.createIndex({"mnn" : 1}); 
-    collectionLP.createIndex({"num_reg" : 1}); 
-    collectionLP.createIndex({"trade_name" : 1}); 
-   
-    const collectionKLP = db.collection("klp_load");
+
+    collectionLP.createIndex({ "manufacturer_name": 1 });
+    collectionLP.createIndex({ "mnn": 1 });
+    collectionLP.createIndex({ "num_reg": 1 });
+    collectionLP.createIndex({ "trade_name": 1 });
+
     collectionKLP.deleteMany({});
-    collectionKLP.createIndex({"attr_UUID" : 1});
-    collectionKLP.createIndex({"klp_lim_price_list.children.price_value" : 1});
-    collectionKLP.createIndex({"num_reg" : 1}).catch((error) => {
-             console.error(error);
-            });
-    collectionKLP.createIndex({"parent_SMNN_UUID" : 1}).catch((error) => {
-      console.error(error);
-     });;
- 
+    collectionKLP.createIndex({ "attr_UUID": 1 });
+    collectionKLP.createIndex({ "klp_lim_price_list.children.price_value": 1 });
+    collectionKLP.createIndex({ "num_reg": 1 });
+    collectionKLP.createIndex({ "parent_SMNN_UUID": 1 })
+  }
+  catch (error) {
+    logging('parser', error, true);
+  };
 
-    
-    let batchTemp = [];
 
-    function saveDataBatch(data) {
-      if (data instanceof Object) {
-        if (batchTemp.length < 10) {
+
+  let batchTemp = [];
+
+  function saveDataBatch(data) {
+    if (data instanceof Object) {
+      if (batchTemp.length < 10) {
+        batchTemp.push(data);
+        //xml.resume();
+        ins++;
+        /*if (ins % 10 == 0)
+          console.info("➕  ", ins);*/
+      } else {
+
+        // xml.pause();
+        if (batchTemp.includes(data))
+          logging('parser', "Duplicate object " + data, true);
+        else {
           batchTemp.push(data);
-          //xml.resume();
-          ins++;
-          /*if (ins % 10 == 0)
-            console.info("➕  ", ins);*/
-        } else {
+          saveToDB();
+          // renameCollections();
 
-          // xml.pause();
-          if (batchTemp.includes(data))
-            console.log("Duplicate object " + data);
-          else {
-            batchTemp.push(data);
-            saveToDB();
-           // renameCollections();
-    
-          }
         }
       }
     }
+  }
 
 
-    function saveToDB(last_save = false)
-    {
-      collectionMNN.insertMany(batchTemp).then(result => {
-        //console.log(data);
-        console.info("➕  " + ins + " all " + cnt_all);
-        //xml.resume()
-      },
-        err => {
-          console.log(data);
-          Errors.push(err);
-          //xml.resume();
-        });
-      batchTemp = [];
-      collectionSMNN.insertMany(smnnList).then(result => {
-        console.info("smnn");
-      },
-        err => {
-          console.log(err);
-          Errors.push(err);
-        });
-      smnnList = [];
+  function saveToDB(last_save = false) {
+    collectionMNN.insertMany(batchTemp).then(result => {
+      //logging('parser',data);
+      logging('parser',"mnn ➕  " + ins + " all " + cnt_all);
+      //xml.resume()
+    },
+      err => {
+        logging('parser', err, true);
+        Errors.push(err);
+        //xml.resume();
+      });
+    batchTemp = [];
+    collectionSMNN.insertMany(smnnList).then(result => {
+      //logging('parser',"smnn");
+    },
+      err => {
+        logging('parser', err, true);
+        Errors.push(err);
+      });
+    smnnList = [];
 
-      collectionLP.insertMany(lpList).then(result => {
-        console.info("lp");
+    collectionLP.insertMany(lpList).then(result => {
+      //logging('parser',"lp");
+    },
+      err => {
+        logging('parser', err, true);
+        Errors.push(err);
+      });
+    lpList = [];
+    collectionKLP.insertMany(klpList).then(result => {
+      //console.info("klp");
+      if (last_save)
+        renameCollections();
+    },
+      err => {
+        logging('parser', err, true);
+        Errors.push(err);
+      });
+    klpList = [];
+  }
+
+  logging('parser', "Current directory:", __dirname);
+
+  /*const streamWrite = fs.createWriteStream("./data/extract.json");
+  function saveToFile(data) {
+    streamWrite.write(data);
+  }*/
+
+  const path = require('path')
+  const clientPath = filePath;//path.join(__dirname, 'data/esklp_20230602_active_21.5_00001_0001.xml')
+  //const stream = fs.createReadStream  ("/home/victor/projects/Node/esklp/data/esklp_20230602_active_21.5_00001_0001.xml");
+
+
+  //var parser = sax.parser(true);
+
+  var sax = require('./sax.js')
+
+  var saxStream = sax.createStream(true)
+
+  const tagCollect = "NS2:GROUP";
+
+  function renameCollection(collectionNameOld, collectionNameNew) {
+    const collection_old = db.collection(collectionNameOld);
+    const collection_new = db.collection(collectionNameNew);
+
+    collection_new.drop().then(result => {
+      logging('parser',collectionNameNew + " dropped");
+      collection_old.rename(collectionNameNew).then(result => {
+        logging('parser',collectionNameOld + " renamed to " + collectionNameNew);
       },
         err => {
-          console.log(err);
+          console.error("Err rename coll " + collectionNameNew + " : " + err);
           Errors.push(err);
         });
-      lpList = [];
-      collectionKLP.insertMany(klpList).then(result => {
-        console.info("klp");
-        if(last_save)
-          renameCollections();
-      },
-        err => {
-          console.log(err);
-          Errors.push(err);
-        });
-      klpList = [];
+    },
+      err => {
+        console.error("Err drop coll " + collectionNameNew + " : " + err);
+        Errors.push(err);
+      });
+  }
+
+  function renameCollections() {
+    renameCollection("mnn_load", "mnn");
+    renameCollection("smnn_load", "smnn");
+    renameCollection("lp_load", "lp");
+    renameCollection("klp_load", "klp");
+  }
+
+  cur_ch = undefined
+  product = undefined
+  currentTag = undefined
+
+  saxStream.on("closetag", function (tagName) {
+    cnt_all++;
+    if (tagName.toUpperCase() === tagCollect && product != null) {
+      if (product.children.length > 1) {
+        // normalizeProduct(product);
+        product_clone = cloneTag(product, 100, true, 1, smnnList, lpList, klpList, product.attributes.UUID, product.attributes.name);
+        products.push(product_clone)
+        saveDataBatch(product_clone)
+        currentTag = product = product_clone = null
+        return
+      }
     }
-
-    console.log("Current directory:", __dirname);
-
-    /*const streamWrite = fs.createWriteStream("./data/extract.json");
-    function saveToFile(data) {
-      streamWrite.write(data);
-    }*/
-
-    const path = require('path')
-    const clientPath = filePath;//path.join(__dirname, 'data/esklp_20230602_active_21.5_00001_0001.xml')
-    //const stream = fs.createReadStream  ("/home/victor/projects/Node/esklp/data/esklp_20230602_active_21.5_00001_0001.xml");
-
-
-    //var parser = sax.parser(true);
-
-    var sax = require('./sax.js')
-
-    var saxStream = sax.createStream(true)
-
-    const tagCollect = "NS2:GROUP";
-
-    function renameCollection(collectionNameOld, collectionNameNew)
-    {
-      const collection_old = db.collection(collectionNameOld);
-      const collection_new = db.collection(collectionNameNew);
-    
-      collection_new.drop().then(result => {
-        console.info(collectionNameNew +" dropped");
-        collection_old.rename(collectionNameNew).then(result => {
-          console.info(collectionNameOld + " renamed to " + collectionNameNew);
-        },
-          err => {
-            console.error("Err rename coll " + collectionNameNew + " : " + err);
-            Errors.push(err);
-          });
-      },
-        err => {
-          console.error("Err drop coll " + collectionNameNew + " : " + err);
-          Errors.push(err);
-        });
+    if (currentTag && currentTag.parent) {
+      var p = currentTag.parent
+      //delete currentTag.parent
+      currentTag = p
     }
+    //logging('parser',tagName);
+  })
 
-    function renameCollections()
-    {
-      renameCollection("mnn_load", "mnn");
-      renameCollection("smnn_load", "smnn");
-      renameCollection("lp_load", "lp");
-      renameCollection("klp_load", "klp");
+  saxStream.on("opentag", function (tag) {
+    if (tag.name.toUpperCase() !== tagCollect && !product) return
+    if (tag.name.toUpperCase() === tagCollect) {
+      product = tag;
     }
+    tag.parent = currentTag
+    tag.children = []
+    tag.parent && tag.parent.children.push(tag)
+    /*if (tag.parent)
+      tag.parent[tag.name.replace('NS2:', '')] = tag;*/
+    currentTag = tag
+    //logging('parser',tag.name);
+  })
 
-    cur_ch = undefined
-    product = undefined
-    currentTag = undefined
-
-    saxStream.on("closetag", function (tagName) {
-      cnt_all++;
-      if (tagName.toUpperCase() === tagCollect && product != null) {
-        if (product.children.length > 1) {
-          // normalizeProduct(product);
-          product_clone = cloneTag(product, 100, true, 1, smnnList, lpList, klpList, product.attributes.UUID, product.attributes.name);
-          products.push(product_clone)
-          saveDataBatch(product_clone)
-          currentTag = product = product_clone = null
-          return
-        }
-      }
-      if (currentTag && currentTag.parent) {
-        var p = currentTag.parent
-        //delete currentTag.parent
-        currentTag = p
-      }
-      //console.log(tagName);
-    })
-
-    saxStream.on("opentag", function (tag) {
-      if (tag.name.toUpperCase() !== tagCollect && !product) return
-      if (tag.name.toUpperCase() === tagCollect) {
-        product = tag;
-      }
-      tag.parent = currentTag
-      tag.children = []
-      tag.parent && tag.parent.children.push(tag)
-      /*if (tag.parent)
-        tag.parent[tag.name.replace('NS2:', '')] = tag;*/
-      currentTag = tag
-      //console.log(tag.name);
-    })
-
-    saxStream.on("text", function (text) {
-      if (currentTag)
-        currentTag.children.push(text)
-      //console.log(text);
-    });
-
-    saxStream.on("end", function () {
-      if (batchTemp && batchTemp.length > 0) {
-        saveToDB(true);
-      }
-      console.log("finished document!");
-      console.timeEnd('parse');
-      
-     
-    });
-
-    console.time('parse');
-    const stream = fs.createReadStream(clientPath)
-      .pipe(saxStream);
-
-  }), err => {
-    console.log(err);
+  saxStream.on("text", function (text) {
+    if (currentTag)
+      currentTag.children.push(text)
+    //logging('parser',text);
   });
+
+  saxStream.on("end", function () {
+    if (batchTemp && batchTemp.length > 0) {
+      saveToDB(true);
+    }
+    logging('parser', "finished document!");
+    console.timeEnd('parse');
+    if (typeof(endOfLoadCallback) != 'undefined')
+    {
+      setTimeout(() => {
+        endOfLoadCallback(filePath);
+      }, 2000);
+    }  
+    return true;
+  });
+
+  console.time('parse');
+  const stream = await fs.createReadStream(clientPath).pipe(saxStream);
+
 }
+
+/*), err => {
+  logging('parser',err, true);
+  return false;
+});
+}*/
+
+
+
 
 if (require.main === module) {
   if (process.argv.length < 3)
-    console.log("Необходимо передать путь к файлу в качестве аргумента");
+    logging('parser', "Необходимо передать путь к файлу в качестве аргумента", true);
   else
     loadFile(process.argv[2]);
 }
+
+exports.loadFile = loadFile;
 
 

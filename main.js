@@ -31,59 +31,9 @@ var fs = require('fs');
     return date.toLocaleString("en-UK", options).replaceAll("/", delim);
 }*/
 
+const logging = require('./logger.js');
 
-function formatDate(date, delim = '-') {
-    var d = new Date(date),
-        month = '' + (d.getMonth() + 1),
-        day = '' + d.getDate(),
-        year = d.getFullYear();
-
-    if (month.length < 2) 
-        month = '0' + month;
-    if (day.length < 2) 
-        day = '0' + day;
-
-    return [year, month, day].join(delim);
-}
-
-
-function checkCreateFolderAndWrite(folder, text, filename, callback) {
-    fs.access(folder, fs.F_OK, (err) => {
-        if (err) {
-            fs.mkdir(folder, (err) => {
-              if (err) {
-                console.error('Ошибка при создании каталога: ' + folder, err);
-              } else {
-                callback(text, folder, filename);
-              }
-              
-              });
-        }
-        callback(text, folder, filename);
-      })
-}
-
-function appendTextToFile(text, folder, fileName) {
-    fs.appendFile(folder + "/" + fileName, text, err => {
-        if (err) {
-            console.error(err);
-        }
-    });    
-}
-
-
-function logging(message, isError = false) {
-    date = new Date();
-    datStr = formatDate(date, "_");
-    fileName = isError ? 'error_' + datStr + '.log':'common_' + datStr + '.log';
-    timePrefix = "[" + date.toLocaleTimeString("ru") + "] ";
-    checkCreateFolderAndWrite('log', timePrefix +  message + '\n', fileName, appendTextToFile);
-   
-    if (isError) 
-        console.error(timePrefix +  message);
-    else
-        console.log(timePrefix + message);    
-}
+const ftpLoader = require('./ftp-esklp.js');
 
 function regExpEscape(literal_string) {
     return literal_string.replace(/[-[\]{}()*+!<=:?.\/\\^$|#\s,]/g, '\\$&');
@@ -94,12 +44,12 @@ let timers = {};
 
 function timeStart(label){
     timers[label] = performance.now();
-    logging(label + ' start');
+    logging('main', label + ' start');
 }
 
 function timeEnd(label){
     let dur = performance.now() - timers[label];
-    logging(label + ' duration : ' + dur + ' ms ');
+    logging('main', label + ' duration : ' + dur + ' ms ');
 }
 
 
@@ -107,9 +57,10 @@ function timeEnd(label){
 function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, res) {
 
     try {
-        timeStart('get_SMNN');
+        uuid = uuidv4();
+        timeStart('get_SMNN.' + uuid);
         client.connect().then(mongoClient => {
-            logging("Подключение к БД установлено");
+            logging('main',"Подключение к БД установлено");
 
             const db = client.db("esklp_service");
             //коллекция МНН
@@ -134,7 +85,7 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
             if (typeof userQuery != 'undefined' && Object.keys(userQuery).length !== 0)
                 query = { $and: [query, userQuery] };
 
-            logging('query = ' + JSON.stringify(query));
+            logging('main','query = ' + JSON.stringify(query));
             cursor = col_MNN.find(query).sort({ 'attr_name': 1 }).collation({ locale: 'ru', strength: 1 });
 
             //массив возвращаемых документов
@@ -149,7 +100,7 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
 
             allDocuments.then(arr => {
                 arr.forEach(doc => {
-                    logging(doc);
+                    logging('main',doc);
                     if (withKLP && doc.smnn_list.children.length > 0) {
                         pr = doc.smnn_list.children.forEach(function (smnn) {
                             smnn.KLP_LIST_JOINED = [];
@@ -175,7 +126,7 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
                     }
                 }).then(r => {   //после того, как все заполнено, возвращаем обогащенные МНН
                     res.send(docs);
-                    timeEnd('get_SMNN');
+                    timeEnd('get_SMNN.' + uuid);
                 }
                 );
             });
@@ -199,10 +150,10 @@ function get_LP(params, res, next) {
 
         client.connect().then(mongoClient => {
             curDate = new Date();
-            logging("******************************");
-            logging("get_LP");
-            logging(curDate + ". Подключение к БД установлено");
-            logging("------------------------------");
+            logging('main',"******************************");
+            logging('main',"get_LP");
+            logging('main',curDate + ". Подключение к БД установлено");
+            logging('main',"------------------------------");
 
             const db = client.db("esklp_service");
             //коллекция МНН
@@ -262,7 +213,7 @@ function get_LP(params, res, next) {
             if ('num_reg' in params)
                 query = { $and: [query, { "num_reg": params.num_reg }] };
 
-            logging('query = ' + JSON.stringify(query));
+            logging('main','query = ' + JSON.stringify(query));
 
             distinct = false;
             if ('distinct' in params) {
@@ -295,7 +246,7 @@ function get_LP(params, res, next) {
                                 res_doc[field].push(doc[field]);
                     }
                     else {
-                        // logging(doc);
+                        // logging('main',doc);
                         docs.push(doc);
                     }
 
@@ -303,11 +254,11 @@ function get_LP(params, res, next) {
 
                 //ждем все обработки всех массивов. promises - это массив промисов, каждый из которых возвращает массив КЛП. 
                 // Т.е. результатом ожидания будет массив массивов arraysKLP
-                logging('get_LP.' + uuid + '. Получено ЛП ' + docs.length);
+                logging('main','get_LP.' + uuid + '. Получено ЛП ' + docs.length);
                 res.send(docs);
                 timeEnd('get_LP.' + uuid);
-                logging("------------------------------");
-                logging("******************************");
+                logging('main',"------------------------------");
+                logging('main',"******************************");
             });
             ;
 
@@ -321,10 +272,10 @@ function get_LP(params, res, next) {
 
 function get_KLP_smmnn_uuid(smnn_uid, res) {
     try {
-
-        timeStart('get_KLP_smmnn_uuid');
+        uuid = uuidv4();
+        timeStart('get_KLP_smmnn_uuid.' + uuid);
         client.connect().then(mongoClient => {
-            logging("Подключение к БД установлено");
+            logging('main',"Подключение к БД установлено");
 
             const db = client.db("esklp_service");
             //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
@@ -345,7 +296,7 @@ function get_KLP_smmnn_uuid(smnn_uid, res) {
                 });
             }).then(r => {   //после того, как все заполнено, возвращаем KLP
                 res.send(docs);
-                timeEnd('get_KLP_smmnn_uuid');
+                timeEnd('get_KLP_smmnn_uuid.' + uuid);
             });
         });
     } catch (error) {
@@ -357,9 +308,10 @@ function get_KLP_smmnn_uuid(smnn_uid, res) {
 
 function get_KLP_MNN(MNN, res) {
     try {
-        timeStart('get_KLP_MNN');
+        uuid = uuidv4();
+        timeStart('get_KLP_MNN.'+ uuid);
         client.connect().then(mongoClient => {
-            logging("Подключение к БД установлено");
+            logging('main',"Подключение к БД установлено");
 
             const db = client.db("esklp_service");
             //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
@@ -380,7 +332,7 @@ function get_KLP_MNN(MNN, res) {
                 });
             }).then(r => {   //после того, как все заполнено, возвращаем KLP
                 res.send(docs);
-                timeEnd('get_KLP_MNN');
+                timeEnd('get_KLP_MNN.' + uuid);
             });
         });
     } catch (error) {
@@ -391,9 +343,10 @@ function get_KLP_MNN(MNN, res) {
 
 function get_KLP_smmnn_uuid_list(smnn_uid_list, res) {
     try {
-        timeStart('get_KLP_smmnn_uuid_list');
+        uuid = uuidv4();
+        timeStart('get_KLP_smmnn_uuid_list.' + uuid);
         client.connect().then(mongoClient => {
-            logging("Подключение к БД установлено");
+            logging('main',"Подключение к БД установлено");
 
             const db = client.db("esklp_service");
             //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
@@ -414,7 +367,7 @@ function get_KLP_smmnn_uuid_list(smnn_uid_list, res) {
                 });
             }).then(r => {   //после того, как все заполнено, возвращаем KLP
                 res.send(docs);
-                timeEnd('get_KLP_smmnn_uuid_list');
+                timeEnd('get_KLP_smmnn_uuid_list.' + uuid);
             });
         });
     } catch (error) {
@@ -430,10 +383,10 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
         client.connect().then(mongoClient => {
             curDate = new Date();
 
-            logging("******************************");
-            logging("get_KLP_uuid_list");
-            logging(curDate + ". Подключение к БД установлено");
-            logging("------------------------------");
+            logging('main',"******************************");
+            logging('main',"get_KLP_uuid_list");
+            logging('main',curDate + ". Подключение к БД установлено");
+            logging('main',"------------------------------");
             const db = client.db("esklp_service");
             //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
             const col_KLP = db.collection("klp");
@@ -479,7 +432,7 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
                 else
                     userQuery = { $and: [userQuery, { "manufacturer.name": { $regex: regExpEscape(params.manufacturer), $options: "i" } }] };
 
-            logging('query = ' + JSON.stringify(userQuery));
+            logging('main','query = ' + JSON.stringify(userQuery));
 
             const cursorKLP = col_KLP.find(userQuery).sort({ 'trade_name': 1, 'lf_norm_name': 1, 'dosage_norm_name': 1, 'consumer_total': 1 });
 
@@ -496,10 +449,10 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
                 });
             }).then(r => {   //после того, как все заполнено, возвращаем KLP
                 res.send(docs);
-                logging('get_KLP_uuid_list.' + uuid + '. Получено КЛП по списку UUID ' + docs.length);
+                logging('main','get_KLP_uuid_list.' + uuid + '. Получено КЛП по списку UUID ' + docs.length);
                 timeEnd('get_KLP_uuid_list.' + uuid);
-                logging("------------------------------");
-                logging("******************************");
+                logging('main',"------------------------------");
+                logging('main',"******************************");
             });
         });
     } catch (error) {
@@ -515,10 +468,10 @@ function get_KLP_by_price(trade_name, params, res) {
         timeStart('get_KLP_by_price.' + uuid);
         client.connect().then(mongoClient => {
             curDate = new Date();
-            logging("******************************");
-            logging("get_KLP_by_price");
-            logging(curDate + ". Подключение к БД установлено");
-            logging("------------------------------");
+            logging('main',"******************************");
+            logging('main',"get_KLP_by_price");
+            logging('main',curDate + ". Подключение к БД установлено");
+            logging('main',"------------------------------");
 
             const db = client.db("esklp_service");
             //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
@@ -569,7 +522,7 @@ function get_KLP_by_price(trade_name, params, res) {
                 }
             ];
 
-            logging('query = ' + JSON.stringify(query));
+            logging('main','query = ' + JSON.stringify(query));
 
             const cursorKLP = col_KLP.aggregate(query
                 ,
@@ -589,10 +542,10 @@ function get_KLP_by_price(trade_name, params, res) {
                 });
             }).then(r => {   //после того, как все заполнено, возвращаем KLP
                 res.send(docs);
-                logging('get_KLP_by_price.' + uuid + '. Получено КЛП по цене ' + docs.length);
+                logging('main','get_KLP_by_price.' + uuid + '. Получено КЛП по цене ' + docs.length);
                 timeEnd('get_KLP_by_price.' + uuid);
-                logging("------------------------------");
-                logging("******************************");
+                logging('main',"------------------------------");
+                logging('main',"******************************");
             });
         });
     } catch (error) {
@@ -602,6 +555,10 @@ function get_KLP_by_price(trade_name, params, res) {
 }
 
 
+function update_ESKLP()
+{
+
+}
 
 app.get('/smnn_by_name/:exact/:with_klp/:only_actual/:name', function (req, res) {
     const name = req.params.name;
@@ -728,7 +685,7 @@ app.get('/klp_by_mnn/:mnn', function (req, res) {
     // получаем данные из тела запроса и сохраняем в конст.
     const data = req.body;
     // посмотрим что у нас там? 
-    logging(data);
+    logging('main',data);
     // добавляем полученные данные к постам
     posts.push(data);
     // чтобы не было бесконечного цикла - вернем все посты на страницу
@@ -744,6 +701,11 @@ function errorHandler(err, req, res, next) {
     res.render('error', { error: err });
 }
 
+
+app.get('/update_esklp', function (req, res) {
+    ftpLoader.loadLastFile(); 
+});
+
 app.use(errorHandler);
 
 process.on('uncaughtException', (error) => {
@@ -755,6 +717,6 @@ process.on('uncaughtException', (error) => {
 });
 
 app.listen(port, (err) => {
-    logging(`Server run on ${port} port`)
+    logging('main',`Server run on ${port} port`)
 });
 
