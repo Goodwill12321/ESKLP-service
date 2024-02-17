@@ -14,10 +14,47 @@ const MongoClient = require("mongodb").MongoClient;
 const client = new MongoClient("mongodb://127.0.0.1:27017");
 
 
+const winston = require('winston');
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  defaultMeta: { service: 'user-service' },
+  transports: [
+    //
+    // - Write all logs with importance level of `error` or less to `error.log`
+    // - Write all logs with importance level of `info` or less to `combined.log`
+    //
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'combined.log' }),
+    
+  ],
+  exceptionHandlers: [
+    new winston.transports.File({ filename: 'exceptions.log' })
+  ],
+  rejectionHandlers: [
+    new winston.transports.File({ filename: 'rejections.log' })
+  ],
+  exitOnError: false
+  
+});
+
+//
+// If we're not in production then log to the `console` with the format:
+// `${info.level}: ${info.message} JSON.stringify({ ...rest }) `
+//
+if (process.env.NODE_ENV !== 'production') {
+  logger.add(new winston.transports.Console({
+    format: winston.format.simple(),
+  }));
+}
+
+
+
 function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, res) {
-    console.time('get_SMNN');
+    logger.profile('get_SMNN');
     client.connect().then(mongoClient => {
-        console.log("Подключение к БД установлено");
+        logger.info("Подключение к БД установлено");
 
         const db = client.db("esklp_service");
         //коллекция МНН
@@ -44,7 +81,7 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
         if (typeof userQuery != 'undefined' && Object.keys(userQuery).length !== 0)
             query = { $and: [query, userQuery] };
 
-        console.log('query = ' + JSON.stringify(query));
+        logger.info('query = ' + JSON.stringify(query));
         cursor = col_MNN.find(query).sort({ 'attr_name': 1 }).collation({ locale: 'ru', strength: 1 });
 
         //массив возвращаемых документов
@@ -59,7 +96,7 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
 
         allDocuments.then(arr => {
             arr.forEach(doc => {
-                console.log(doc);
+                logger.info(doc);
                 if (withKLP && doc.smnn_list.children.length > 0) {
                     pr = doc.smnn_list.children.forEach(function (smnn) {
                         smnn.KLP_LIST_JOINED = [];
@@ -85,7 +122,7 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
                 }
             }).then(r => {   //после того, как все заполнено, возвращаем обогащенные МНН
                 res.send(docs);
-                console.timeEnd('get_SMNN');
+                logger.profile('get_SMNN');
             }
             );
         });
@@ -101,14 +138,14 @@ function regExpEscape(literal_string) {
 
 function get_LP(params, res) {
     uuid = uuidv4();
-    console.time('get_LP.' + uuid);
+    logger.profile('get_LP.' + uuid);
 
     client.connect().then(mongoClient => {
         curDate = new Date();
-        console.log("******************************");
-        console.log("get_LP");
-        console.log(curDate + ". Подключение к БД установлено");
-        console.log("------------------------------");
+        //console.info("******************************");
+        //console.info("get_LP");
+        logger.info(curDate + ". Подключение к БД установлено");
+        //console.info("------------------------------");
       
         const db = client.db("esklp_service");
         //коллекция МНН
@@ -171,7 +208,7 @@ function get_LP(params, res) {
         if ('num_reg' in params)
             query = { $and: [query, { "num_reg": params.num_reg }] };           
 
-        console.log('query = ' + JSON.stringify(query));
+        logger.info('query = ' + JSON.stringify(query));
         
         distinct = false;
         if ('distinct' in params)
@@ -216,11 +253,11 @@ function get_LP(params, res) {
 
             //ждем все обработки всех массивов. promises - это массив промисов, каждый из которых возвращает массив КЛП. 
             // Т.е. результатом ожидания будет массив массивов arraysKLP
-            console.log('get_LP.' +uuid + '. Получено ЛП ' + docs.length);
+            logger.info('get_LP.' +uuid + '. Получено ЛП ' + docs.length);
             res.send(docs);
-            console.timeEnd('get_LP.' + uuid);
-            console.log("------------------------------");
-            console.log("******************************");
+            logger.profile('get_LP.' + uuid);
+            //console.log("------------------------------");
+            //console.log("******************************");
         });
         ;
 
@@ -229,9 +266,9 @@ function get_LP(params, res) {
 
 
 function get_KLP_smmnn_uuid(smnn_uid, res) {
-    console.time('get_KLP_smmnn_uuid');
+    logger.profile('get_KLP_smmnn_uuid');
     client.connect().then(mongoClient => {
-        console.log("Подключение к БД установлено");
+        logger.info("Подключение к БД установлено");
 
         const db = client.db("esklp_service");
         //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
@@ -252,7 +289,7 @@ function get_KLP_smmnn_uuid(smnn_uid, res) {
             });
         }).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
-            console.timeEnd('get_KLP_smmnn_uuid');
+            logger.profile('get_KLP_smmnn_uuid');
         });
     });
 }
@@ -260,9 +297,9 @@ function get_KLP_smmnn_uuid(smnn_uid, res) {
 
 
 function get_KLP_MNN(MNN, res) {
-    console.time('get_KLP_MNN');
+    logger.profile('get_KLP_MNN');
     client.connect().then(mongoClient => {
-        console.log("Подключение к БД установлено");
+        logger.info("Подключение к БД установлено");
 
         const db = client.db("esklp_service");
         //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
@@ -283,15 +320,15 @@ function get_KLP_MNN(MNN, res) {
             });
         }).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
-            console.timeEnd('get_KLP_MNN');
+            logger.profile('get_KLP_MNN');
         });
     });
 }
 
 function get_KLP_smmnn_uuid_list(smnn_uid_list, res) {
-    console.time('get_KLP_smmnn_uuid_list');
+    logger.profile('get_KLP_smmnn_uuid_list');
     client.connect().then(mongoClient => {
-        console.log("Подключение к БД установлено");
+        logger.info("Подключение к БД установлено");
 
         const db = client.db("esklp_service");
         //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
@@ -312,21 +349,21 @@ function get_KLP_smmnn_uuid_list(smnn_uid_list, res) {
             });
         }).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
-            console.timeEnd('get_KLP_smmnn_uuid_list');
+            logger.profile('get_KLP_smmnn_uuid_list');
         });
     });
 }
 
 function get_KLP_uuid_list(klp_uid_list, params, res) {
     uuid = uuidv4();
-    console.time('get_KLP_uuid_list.' + uuid);
+    logger.profile('get_KLP_uuid_list.' + uuid);
     client.connect().then(mongoClient => {
         curDate = new Date();
         
-        console.log("******************************");
-        console.log("get_KLP_uuid_list");
-        console.log(curDate + ". Подключение к БД установлено");
-        console.log("------------------------------");
+        //console.log("******************************");
+        logger.info("get_KLP_uuid_list");
+        logger.info(curDate + ". Подключение к БД установлено");
+        //console.log("------------------------------");
         const db = client.db("esklp_service");
         //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
         const col_KLP = db.collection("klp");
@@ -372,7 +409,7 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
             else
                 userQuery = { $and: [userQuery, { "manufacturer.name": { $regex: regExpEscape(params.manufacturer), $options: "i" } }] };
         
-        console.log('query = ' + JSON.stringify(userQuery));
+        logger.info('query = ' + JSON.stringify(userQuery));
 
         const cursorKLP = col_KLP.find(userQuery).sort({ 'trade_name': 1, 'lf_norm_name': 1, 'dosage_norm_name': 1, 'consumer_total': 1 });
 
@@ -389,10 +426,10 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
             });
         }).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
-            console.log('get_KLP_uuid_list.' + uuid + '. Получено КЛП по списку UUID ' + docs.length);
-            console.timeEnd('get_KLP_uuid_list.' + uuid);
-            console.log("------------------------------");
-            console.log("******************************");
+            logger.info('get_KLP_uuid_list.' + uuid + '. Получено КЛП по списку UUID ' + docs.length);
+            logger.profile('get_KLP_uuid_list.' + uuid);
+            //console.log("------------------------------");
+            //console.log("******************************");
         });
     });
 }
@@ -400,13 +437,13 @@ function get_KLP_uuid_list(klp_uid_list, params, res) {
 
 function get_KLP_by_price(trade_name, params, res) {
     uuid = uuidv4();
-    console.time('get_KLP_by_price.' + uuid);
+    logger.profile('get_KLP_by_price.' + uuid);
     client.connect().then(mongoClient => {
         curDate = new Date();
-        console.log("******************************");
-        console.log("get_KLP_by_price");
-        console.log(curDate + ". Подключение к БД установлено");
-        console.log("------------------------------");
+        //console.log("******************************");
+        logger.info("get_KLP_by_price");
+        logger.info(curDate + ". Подключение к БД установлено");
+        //console.log("------------------------------");
         
         const db = client.db("esklp_service");
         //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
@@ -457,7 +494,7 @@ function get_KLP_by_price(trade_name, params, res) {
             } 
         ];
 
-        console.log('query = ' + JSON.stringify(query));
+        logger.info('query = ' + JSON.stringify(query));
 
         const cursorKLP = col_KLP.aggregate(query
                 ,
@@ -477,10 +514,10 @@ function get_KLP_by_price(trade_name, params, res) {
             });
         }).then(r => {   //после того, как все заполнено, возвращаем KLP
             res.send(docs);
-            console.log('get_KLP_by_price.' + uuid + '. Получено КЛП по цене ' + docs.length);
-            console.timeEnd('get_KLP_by_price.' + uuid);
-            console.log("------------------------------");
-            console.log("******************************");
+            logger.info('get_KLP_by_price.' + uuid + '. Получено КЛП по цене ' + docs.length);
+            logger.profile('get_KLP_by_price.' + uuid);
+            //console.log("------------------------------");
+            //console.log("******************************");
         });
     });
 }
@@ -495,40 +532,16 @@ app.get('/smnn_by_name/:exact/:with_klp/:only_actual/:name', function (req, res)
     only_actual = req.params.only_actual == "1";
 
     userQuery = {};
-    /* if ('trade_name' in req.query)
-         userQuery =  {$and : [userQuery, {"klp_list.LekPreps.trade_name" : req.query.trade_name}]};
-     if ('dosage' in req.query)
-         userQuery =  {$and : [userQuery, {"klp_list.LekPreps.dosage_norm_name" : req.query.dosage}]};
-     if ('lek_form' in req.query)
-         userQuery =  {$and : [userQuery, {"klp_list.LekPreps.lf_norm_name" : req.query.lek_form}]};
-     if ('pack_1_name' in req.query)
-         userQuery =  {$and : [userQuery, {"klp_list.LekPreps.pack1_name" : req.query.pack_1_name}]};
-     if ('manufacturer' in req.query)
-         userQuery =  {$and : [userQuery, {"klp_list.LekPreps.manufacturer_name" : req.query.manufacturer}]};**/
-
+   
     get_SMNN(name, only_actual, exact, with_klp, userQuery, res);
 });
 
 
 
+
 app.post('/lp_by_name', function (req, res) {
 
-    /*  const name = req.params.mnn;
-      exact = req.params.exact == "1";
-      only_actual = req.params.only_actual == "1";*/
-
-    /* userQuery = {};
-     if ('trade_name' in req.query)
-         userQuery = { $and: [userQuery, { "trade_name": req.query.trade_name }] };
-     if ('dosage' in req.query)
-         userQuery = { $and: [userQuery, { "dosage_norm_name": req.query.dosage }] };
-     if ('lek_form' in req.query)
-         userQuery = { $and: [userQuery, { "lf_norm_name": req.query.lek_form }] };
-     if ('pack_1_name' in req.query)
-         userQuery = { $and: [userQuery, { "pack1_name": req.query.pack_1_name }] };
-     if ('manufacturer' in req.query)
-         userQuery = { $and: [userQuery, { "manufacturer_name": req.query.manufacturer }] };*/
-
+    
     const klp_uid_list = req.body;
     let body = '';
     req.on('data', chunk => {
@@ -600,6 +613,58 @@ app.post('/klp_by_lim_price', function (req, res) {
 app.get('/klp_by_mnn/:mnn', function (req, res) {
     const mnn = req.params.mnn;
     get_KLP_MNN(mnn, res);
+});
+
+
+app.get('/log_query', function (req, res) {
+    
+    if (!('from_time' in req.query))
+    {
+        res.status(500);
+        res.send('Parameter "from_time" not specified');
+        return;
+    }
+
+    let from_time = Date.parse(req.query.from_time);
+    if(isNaN(from_time))
+    {
+        res.status(500);
+        res.send('Parameter "from_time" is not right format: "'+req.query.from_time+'"');
+        return;
+    }
+
+    const to_time = new Date();
+    if ('to_time' in req.query)
+    {
+        to_time = Date.parse(req.query.to_time);
+        if(isNaN(to_time))
+        {
+            res.status(500);
+            res.send('Parameter "to_time" is not right format: "'+req.query.to_time+'"');
+            return;
+        }
+    }
+    
+    const options = {
+        from: new Date() - (24 * 60 * 60 * 1000),
+        until: new Date(),
+        limit: 500,
+        start: 0,
+        order: 'desc',
+        filename: 'exceptions.log' 
+       // fields: ['message']
+      };
+      
+      //
+      // Find items logged between today and yesterday.
+      //
+      logger.query(options, function (err, results) {
+        if (err) {
+          /* TODO: handle me */
+          throw err;
+        }
+        res.send(results);
+      });
 });
 
 
