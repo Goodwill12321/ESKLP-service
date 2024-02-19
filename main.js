@@ -170,7 +170,7 @@ function get_LP(params, res, next) {
             }
 
             if (params.only_actual) {
-                date_end_cond = { $or: [{ "date_end_dt": { $gt: new Date() }, "date_end": { $exists: false } }] };
+                date_end_cond = { $or: [{ "date_end": { $gt: new Date() }, "date_end": { $exists: false } }] };
                 if (Object.keys(query_name).length !== 0)
                     query = { $and: [query_name, date_end_cond] };
                 else
@@ -555,10 +555,46 @@ function get_KLP_by_price(trade_name, params, res) {
 }
 
 
-function update_ESKLP()
+function test_Func()
 {
-
+    
 }
+
+function get_Update_ESKLP_Date(res) {
+    try {
+        uuid = uuidv4();
+        timeStart('get_Update_ESKLP_Date.'+ uuid);
+        client.connect().then(mongoClient => {
+            logging('main', "Connected to DB");
+
+            const db = client.db("esklp_service");
+            //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
+            const connLoad_info = db.collection("load_info");
+            //ищем МНН по имени
+            const cursorLoadDate = connLoad_info.find().sort({"update_time" : -1}).limit(1);
+
+            //массив возвращаемых документов
+            let docs = [];
+            //асинхронный вызов получения массива документов
+            const allDocuments = cursorLoadDate.toArray();
+
+
+            allDocuments.then(arr => {
+                arr.forEach(doc => {
+                    //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
+                    docs.push(doc);
+                });
+            }).then(r => {   //после того, как все заполнено, возвращаем KLP
+                res.send(docs);
+                timeEnd('get_Update_ESKLP_Date.' + uuid);
+            });
+        });
+    } catch (error) {
+        console.error(error);
+        handleError(error, res);
+    }
+}
+
 
 app.get('/smnn_by_name/:exact/:with_klp/:only_actual/:name', function (req, res) {
     const name = req.params.name;
@@ -704,6 +740,11 @@ function errorHandler(err, req, res, next) {
 
 app.get('/update_esklp', function (req, res) {
     ftpLoader.loadLastFile(); 
+    res.send('loading new file was executed ' + new Date());    
+});
+
+app.get('/get_update_esklp_date', function (req, res) {
+    get_Update_ESKLP_Date(res);  
 });
 
 app.use(errorHandler);

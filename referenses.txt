@@ -1,0 +1,56 @@
+https://github.com/isaacs/sax-js
+
+
+Запросы:
+{"SMNN_LIST.children.FORM": "ЛИОФИЛИЗАТ ДЛЯ ПРИГОТОВЛЕНИЯ РАСТВОРА ДЛЯ ПОДКОЖНОГО ВВЕДЕНИЯ"}
+{"SMNN_LIST.children.KLP_LIST.children.TRADE_NAME":"Метилпреднизолон-натив"}
+{"SMNN_LIST.children.KLP_LIST.children.TRADE_NAME": {  $regex: /предн/i }} или {"SMNN_LIST.children.KLP_LIST.children": { $elemMatch: { TRADE_NAME: { $regex: /предн/i }}}}
+
+
+{$and : [{attr_name: {$regex: 'АИРА', $options: 'i'}}, {date_change : {$gt : "2020-01-01"}}]}
+
+{$and : [{attr_name: {$regex: 'АИРА', $options: 'i'}}, {"smnn_list.children.date_end" : { $exists:false}}]}
+
+
+{$and : [{"klp_list.children": {$size: 4}}, {"klp_list.RegDocs": {$size: 4}}]} - количество элементов в в массиве
+
+[
+  {
+    $match: {
+      attr_UUID: {
+        $in: [
+          "d5ac19e0-2222-11ed-9f9b-6b62532a4372",
+          "d5ac1b98-2222-11ed-9f9b-9f896131231a",
+        ],
+      },
+    },
+  },
+  {
+    $lookup: {
+      from: "smnn",
+      localField: "parent_SMNN_UUID",
+      foreignField: "attr_UUID",
+      as: "smnn_parent",
+    },
+  },
+  {
+    $unwind: {
+      path: "$smnn_parent",
+    },
+  },
+  {
+    $project: {
+      "smnn_parent.parent": 0,
+      "smnn_parent.klp_list": 0,
+      smnn_replace_list: 0,
+    },
+  },
+  {
+    $addFields:
+      
+      {
+        dosage_grls:
+          "$smnn_parent.dosage.grls_value",
+      },
+  },
+]

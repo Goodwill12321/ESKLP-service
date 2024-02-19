@@ -1,7 +1,8 @@
 const { match } = require("assert");
 const { v4: uuidv4 } = require('uuid');
 
-
+const path = require('path')
+  
 const logging = require('./logger.js');
 
 let ins = 0;
@@ -270,31 +271,112 @@ let collectionKLP = undefined;
 //logging('parser',mongoClient.options.dbName); // получаем имя базы данных
 //logging('parser',"Connected successfully to server");
 
+async function fileAlreadyLoaded(fileName)
+{
+   mongoClient = await client.connect();
+   logging('parser', "(fileAlreadyLoaded check) Connected to DB");
+
+    db = client.db("esklp_service");
+
+    collectionLoadinfo = db.collection("load_info");
+    cursorLoaded = await  collectionLoadinfo.findOne({file_name : fileName});
+    if (cursorLoaded !== null)
+    {
+      /*countLoaded = await cursorLoaded.count();
+      if (countLoaded > 0)
+      {*/
+        logging('parser', "File " + filePath + " already loaded");  
+        return true;
+      //}
+    } 
+    return false;
+}
 
 
-async function loadFile(filePath, endOfLoadCallback = undefined) {
+function diff_hours(dt2, dt1)  {
+
+  var diff =(dt2.getTime() - dt1.getTime()) / 1000;
+  diff /= (60 * 60);
+  return Math.abs(Math.round(diff));
+  
+ }
+
+ function diff_minutes(dt2, dt1)  {
+
+  var diff =(dt2.getTime() - dt1.getTime()) / 1000;
+  diff /= 60;
+  return Math.abs(Math.round(diff));
+  
+ }
+
+
+async function checkStartLoad(fileName)
+{
+  mongoClient = await client.connect();
+  logging('parser', "(checkStartLoad) Connected to DB");
+
+  db = client.db("esklp_service");
+
+  collectionLoadinfoStart = db.collection("load_info_start");
+  cursorLoaded = await  collectionLoadinfoStart.findOne({file_name : fileName});
+    
+  if (cursorLoaded !== null)
+  {
+    /*countLoaded = await cursorLoaded.count();
+    if (countLoaded > 0)
+    {
+      arr = await cursorLoaded.toArray();*/
+      start_time = cursorLoaded.start_time;
+      diffMins = diff_minutes(new Date(), start_time);
+      if(diffMins < 20)
+      {
+        logging('parser', "File " + fileName + " have already started to load at " + start_time);  
+        return false;
+      }  
+  //}
+  }
+  else 
+  {
+    collectionLoadinfoStart.insertOne({start_time : new Date(), 
+                                 file_name : fileName});
+  }
+
+   return true;
+}
+
+
+
+async function loadFile(filePath, fileNameZIP = "", endOfLoadCallback = undefined) {
 
   const fs = require("fs");
+  //const path = require("path");
 
   mongoClient = await client.connect();
-  logging('parser', "Подключение установлено");
+  logging('parser', "Connected to DB");
 
-  try {
+   try {
     db = client.db("esklp_service");
+
+    if (await fileAlreadyLoaded(path.basename(filePath)))
+    {
+      fs.unlinkSync(filePath);        
+      return;
+    } 
     collectionMNN = db.collection("mnn_load");
     collectionSMNN = db.collection("smnn_load");
     collectionLP = db.collection("lp_load");
     collectionKLP = db.collection("klp_load");
 
-    collectionMNN.deleteMany({});
-    collectionSMNN.deleteMany({});
+    await collectionMNN.deleteMany({});
+    await collectionSMNN.deleteMany({});
 
     collectionLP.createIndex({ "manufacturer_name": 1 });
     collectionLP.createIndex({ "mnn": 1 });
     collectionLP.createIndex({ "num_reg": 1 });
     collectionLP.createIndex({ "trade_name": 1 });
+    
 
-    collectionKLP.deleteMany({});
+    await collectionKLP.deleteMany({});
     collectionKLP.createIndex({ "attr_UUID": 1 });
     collectionKLP.createIndex({ "klp_lim_price_list.children.price_value": 1 });
     collectionKLP.createIndex({ "num_reg": 1 });
@@ -302,6 +384,7 @@ async function loadFile(filePath, endOfLoadCallback = undefined) {
   }
   catch (error) {
     logging('parser', error, true);
+    return
   };
 
 
@@ -324,8 +407,7 @@ async function loadFile(filePath, endOfLoadCallback = undefined) {
         else {
           batchTemp.push(data);
           saveToDB();
-          // renameCollections();
-
+       
         }
       }
     }
@@ -333,6 +415,8 @@ async function loadFile(filePath, endOfLoadCallback = undefined) {
 
 
   function saveToDB(last_save = false) {
+
+    
     collectionMNN.insertMany(batchTemp).then(result => {
       //logging('parser',data);
       logging('parser',"mnn ➕  " + ins + " all " + cnt_all);
@@ -373,14 +457,13 @@ async function loadFile(filePath, endOfLoadCallback = undefined) {
     klpList = [];
   }
 
-  logging('parser', "Current directory:", __dirname);
+  logging('parser', "Current directory:" + __dirname);
 
   /*const streamWrite = fs.createWriteStream("./data/extract.json");
   function saveToFile(data) {
     streamWrite.write(data);
   }*/
 
-  const path = require('path')
   const clientPath = filePath;//path.join(__dirname, 'data/esklp_20230602_active_21.5_00001_0001.xml')
   //const stream = fs.createReadStream  ("/home/victor/projects/Node/esklp/data/esklp_20230602_active_21.5_00001_0001.xml");
 
@@ -403,21 +486,46 @@ async function loadFile(filePath, endOfLoadCallback = undefined) {
         logging('parser',collectionNameOld + " renamed to " + collectionNameNew);
       },
         err => {
-          console.error("Err rename coll " + collectionNameNew + " : " + err);
+          logging('parser', "Err rename coll " + collectionNameNew + " : " + err, true);
           Errors.push(err);
         });
     },
       err => {
-        console.error("Err drop coll " + collectionNameNew + " : " + err);
+        logging('parser', "Err drop coll " + collectionNameNew + " : " + err, true);
         Errors.push(err);
       });
   }
 
-  function renameCollections() {
+  async function renameCollections() {
+
+    let mnnCount = await db.collection("mnn_load").countDocuments();
+    let smnnCount = await db.collection("smnn_load").countDocuments();
+    let lpCount = await db.collection("lp_load").countDocuments();
+    let klpCount = await db.collection("klp_load").countDocuments();
+
     renameCollection("mnn_load", "mnn");
     renameCollection("smnn_load", "smnn");
     renameCollection("lp_load", "lp");
     renameCollection("klp_load", "klp");
+
+    let fileName = path.basename((fileNameZIP === "") ? filePath : fileNameZIP);
+    collectionLoadinfo = db.collection("load_info");
+    //collectionLoadinfo.deleteMany({}).then(result => {
+      collectionLoadinfo.insertOne({update_time : new Date(), 
+                                    mnn_count : mnnCount, 
+                                    smnn_count : smnnCount,
+                                    lp_count : lpCount,
+                                    klp_count : klpCount,
+                                    file_name : fileName});
+      logging('parser', 'inserted load_info update time ');
+    
+    /*},
+      err => {
+        logging('parser', "Err deleteMany collectionLoadinfo : " + err, true);
+        Errors.push(err);
+      });*/
+    //collectionLoadinfo.update({_id : 1}, {update_time : new Date()}, { upsert: true });
+    
   }
 
   cur_ch = undefined
@@ -480,7 +588,7 @@ async function loadFile(filePath, endOfLoadCallback = undefined) {
   });
 
   console.time('parse');
-  const stream = await fs.createReadStream(clientPath).pipe(saxStream);
+  const stream = fs.createReadStream(clientPath).pipe(saxStream);
 
 }
 
@@ -501,5 +609,5 @@ if (require.main === module) {
 }
 
 exports.loadFile = loadFile;
-
-
+exports.fileAlreadyLoaded = fileAlreadyLoaded;
+exports.checkStartLoad = checkStartLoad;

@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const ftp = require("basic-ftp");
 
 const key = 'dfsjvgndfkekjbnweyw23424kjnkj536kj';
-const ftpUserFileName = 'ftp-user.json';
+const ftpUserFileName = __dirname + '/ftp-user.json';
 const downloadDir = __dirname + '/ESKLP_download';
 
 // Функция для шифрования пароля
@@ -84,10 +84,23 @@ async function get_LastFileFrom_FTP() {
         {
             throw 'Не найдены файлы на сервере!';
         }
-        let fileNameLocal = downloadDir + "\\" + lastFile.name;
+        let fileNameLocal = downloadDir + "/" + lastFile.name;
+        let fileNameWitoutZip = lastFile.name.replace('.zip', '');        
+        if (!(await parser.checkStartLoad(fileNameWitoutZip)))
+        {   
+            logging('ftp', 'File ' + fileNameLocal + ' have been already started load!');
+            return null;
+        }
+        
+        if ((await parser.fileAlreadyLoaded(lastFile.name)))
+        {   
+            logging('ftp', 'File ' + fileNameLocal + ' have been already loaded in DB');
+            return null;
+        }
         try{
             fs.accessSync(fileNameLocal);
-            logging('ftp', 'File ' + fileNameLocal + ' have been already loaded');
+            logging('ftp', 'File ' + fileNameLocal + ' have been already downloaded from FTP');
+            return fileNameLocal;
         }
         catch (err) {
             logging('ftp', 'Downloading file ' + lastFile.name + ' to ' + fileNameLocal);
@@ -98,6 +111,7 @@ async function get_LastFileFrom_FTP() {
     }
     catch(err) {
         console.log(err)
+        return null;
     }
     client.close()
 }
@@ -106,6 +120,7 @@ async function get_LastFileFrom_FTP() {
 const parser = require('./parser-sax.js');
 const extractZip = require('extract-zip')
 const logging = require('./logger.js');
+const path = require('path');
 
 let fileNameZIP = "";
 
@@ -113,20 +128,35 @@ async function loadLastFile()
 {
     fileNameZIP = await get_LastFileFrom_FTP();
     
+    if (fileNameZIP === null)
+    {
+        return null;
+    }
     let extractDir = downloadDir + "/extract/";
-    logging('ftp', 'Extracting file ' + fileNameZIP + ' to folder ' + extractDir);
-    await extractZip(fileNameZIP, { dir: extractDir});
-    
-    const fileList = fs.readdirSync(extractDir);
-    for (const fileXml of fileList) {
-        logging('ftp', 'Loading file ' + fileXml + ' in folder ' + extractDir);
-        parser.loadFile(extractDir + fileXml, clearFiles);
-        break;
+    let fileXml = fileNameZIP.replace('.zip', '');
+    let filePathXML = extractDir + path.basename(fileXml);
+
+    try{
+        fs.accessSync(filePathXML);
+        logging('ftp', 'File ' + filePathXML + ' have been already extracted from zip');
+        return;
+    }
+    catch (err) {
+        logging('ftp', 'Extracting file ' + fileNameZIP + ' to folder ' + extractDir);
+        await extractZip(fileNameZIP, { dir: extractDir});
+        
+        const fileList = fs.readdirSync(extractDir);
+        for (const fileXml of fileList) {
+            logging('ftp', 'Loading file ' + fileXml + ' in folder ' + extractDir);
+            filePath = extractDir + fileXml;
+            parser.loadFile(filePath, fileNameZIP, clearFiles);
+            break;
     }
     /*logging('ftp', 'Removing dir ' + extractDir);
     fs.rmdirSync(extractDir); 
     logging('ftp', 'Removing file ' + fileName);
     fs.unlinkSync(fileName); */
+    }
 }
 
 function clearFiles(fileName)
