@@ -285,7 +285,7 @@ async function fileAlreadyLoaded(fileName)
       /*countLoaded = await cursorLoaded.count();
       if (countLoaded > 0)
       {*/
-        logging('parser', "File " + filePath + " already loaded");  
+        logging('parser', "File " + fileName + " already loaded");  
         return true;
       //}
     } 

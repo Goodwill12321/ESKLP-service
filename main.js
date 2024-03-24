@@ -8,7 +8,7 @@ app.use(express.json());
 
 app.use(bodyParser.json())
 
-const port = process.env.PORT || 3000
+
 
 const MongoClient = require("mongodb").MongoClient;
 const client = new MongoClient("mongodb://127.0.0.1:27017");
@@ -206,9 +206,9 @@ function get_LP(params, res, next) {
                 else
                     query = { $and: [query, { "pack1_name": { $regex: regExpEscape(params.pack_1_name), $options: "i" } }] };
             if ('manufacturer' in params)
-                if (params.exactly)
-                    query = { $and: [query, { "manufacturer_name": params.manufacturer }] };
-                else
+                //if (params.exactly)
+                //    query = { $and: [query, { "manufacturer_name": params.manufacturer }] };
+                //else
                     query = { $and: [query, { "manufacturer_name": { $regex: regExpEscape(params.manufacturer), $options: "i" } }] };
             if ('num_reg' in params)
                 query = { $and: [query, { "num_reg": params.num_reg }] };
@@ -304,6 +304,43 @@ function get_KLP_smmnn_uuid(smnn_uid, res) {
         handleError(error, res);
     }
 }
+
+
+function get_MNN_part_name(part_name, res) {
+    try {
+        uuid = uuidv4();
+        timeStart('get_MNN_part_name.' + uuid);
+        client.connect().then(mongoClient => {
+            logging('main',"Подключение к БД установлено");
+
+            const db = client.db("esklp_service");
+            //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
+            const col_MNN = db.collection("mnn");
+            //ищем МНН по имени
+            const cursorMNN = col_MNN.find({ "attr_name": { $regex: regExpEscape(part_name), $options: "i" } }).sort({ 'attr_name': 1});;
+
+            //массив возвращаемых документов
+            let docs = [];
+            //асинхронный вызов получения массива документов
+            const allDocuments = cursorMNN.toArray();
+
+
+            allDocuments.then(arr => {
+                arr.forEach(doc => {
+                    //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
+                    docs.push(doc);
+                });
+            }).then(r => {   //после того, как все заполнено, возвращаем KLP
+                res.send(docs);
+                timeEnd('get_MNN_part_name.' + uuid + ". Count " + docs.length);
+            });
+        });
+    } catch (error) {
+        console.error(error);
+        handleError(error, res);
+    }
+}
+
 
 
 function get_KLP_MNN(MNN, res) {
@@ -710,6 +747,13 @@ app.get('/klp_by_mnn/:mnn', function (req, res) {
     get_KLP_MNN(mnn, res);
 });
 
+app.get('/MNN_by_partname/:mnn', function (req, res) {
+    const mnn = req.params.mnn;
+    get_MNN_part_name(mnn, res);
+});
+
+
+
 
 /*const bodyParser = require('body-parser');
 // после инициализации const app
@@ -747,6 +791,8 @@ app.get('/get_update_esklp_date', function (req, res) {
     get_Update_ESKLP_Date(res);  
 });
 
+
+
 app.use(errorHandler);
 
 process.on('uncaughtException', (error) => {
@@ -756,6 +802,8 @@ process.on('uncaughtException', (error) => {
     //}
     console.error(error.message);
 });
+
+const port = process.env.PORT || 3000
 
 app.listen(port, (err) => {
     logging('main',`Server run on ${port} port`)
