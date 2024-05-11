@@ -476,13 +476,16 @@ async function loadFile(filePath, fileNameZIP = "", endOfLoadCallback = undefine
 
   const tagCollect = "NS2:GROUP";
 
-  function renameCollection(collectionNameOld, collectionNameNew) {
+  async function renameCollection(collectionNameOld, collectionNameNew) {
     const collection_old = db.collection(collectionNameOld);
     const collection_new = db.collection(collectionNameNew);
 
-    collection_new.drop().then(result => {
-      logging('parser',collectionNameNew + " dropped");
-      collection_old.rename(collectionNameNew).then(result => {
+    await collection_new.drop()
+    logging('parser',collectionNameNew + " dropped");
+    await collection_old.rename(collectionNameNew);
+    logging('parser',collectionNameOld + " renamed to " + collectionNameNew);
+    
+/*collection_old.rename(collectionNameNew).then(result => {
         logging('parser',collectionNameOld + " renamed to " + collectionNameNew);
       },
         err => {
@@ -493,7 +496,7 @@ async function loadFile(filePath, fileNameZIP = "", endOfLoadCallback = undefine
       err => {
         logging('parser', "Err drop coll " + collectionNameNew + " : " + err, true);
         Errors.push(err);
-      });
+      });*/
   }
 
   async function renameCollections() {
@@ -503,15 +506,15 @@ async function loadFile(filePath, fileNameZIP = "", endOfLoadCallback = undefine
     let lpCount = await db.collection("lp_load").countDocuments();
     let klpCount = await db.collection("klp_load").countDocuments();
 
-    renameCollection("mnn_load", "mnn");
-    renameCollection("smnn_load", "smnn");
-    renameCollection("lp_load", "lp");
-    renameCollection("klp_load", "klp");
+    await renameCollection("mnn_load", "mnn");
+    await renameCollection("smnn_load", "smnn");
+    await renameCollection("lp_load", "lp");
+    await renameCollection("klp_load", "klp");
 
     let fileName = path.basename((fileNameZIP === "") ? filePath : fileNameZIP);
     collectionLoadinfo = db.collection("load_info");
     //collectionLoadinfo.deleteMany({}).then(result => {
-      collectionLoadinfo.insertOne({update_time : new Date(), 
+    await   collectionLoadinfo.insertOne({update_time : new Date(), 
                                     mnn_count : mnnCount, 
                                     smnn_count : smnnCount,
                                     lp_count : lpCount,
