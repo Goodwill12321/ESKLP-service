@@ -414,7 +414,7 @@ async function loadFile(filePath, fileNameZIP = "", endOfLoadCallback = undefine
   }
 
 
-  function saveToDB(last_save = false) {
+  async function saveToDB(last_save = false) {
 
     
     collectionMNN.insertMany(batchTemp).then(result => {
@@ -555,7 +555,7 @@ async function loadFile(filePath, fileNameZIP = "", endOfLoadCallback = undefine
     //logging('parser',tagName);
   })
 
-  saxStream.on("opentag", function (tag) {
+  saxStream.on("opentag",  function (tag) {
     if (tag.name.toUpperCase() !== tagCollect && !product) return
     if (tag.name.toUpperCase() === tagCollect) {
       product = tag;
@@ -575,9 +575,12 @@ async function loadFile(filePath, fileNameZIP = "", endOfLoadCallback = undefine
     //logging('parser',text);
   });
 
-  saxStream.on("end", function () {
+  saxStream.on("end", async function () {
     if (batchTemp && batchTemp.length > 0) {
-      saveToDB(true);
+      await saveToDB(true);
+    } else
+    {
+      await renameCollections();
     }
     logging('parser', "finished document!");
     console.timeEnd('parse');
