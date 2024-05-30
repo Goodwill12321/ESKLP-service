@@ -117,7 +117,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
           LekPrep.parent_SMNN_UUID = SMNN_UUID;
           LekPrep.mnn = MNN;
           LekPrep.trade_name = clChild.trade_name;
-          LekPrep.date_change = clChild.date_change;
+          //LekPrep.date_change = clChild.date_change;
           LekPrep.num_reg = clChild.num_reg;
           LekPrep.date_reg = clChild.date_reg;
           try {
@@ -157,13 +157,13 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
           LekPrep.okpd2 = clone_parent.okpd2;
 
 
-          LekPrep.klpList.push(clChild.attr_UUID);
+          //LekPrep.klpList.push(clChild.attr_UUID);
 
           let LPRef = LekPrep;
           let isLPExist = false;
           for (let lp of lpList) {
             let match = true;
-            for (let attr in lp) {
+            for (let attr in LekPrep) {
               if (attr != 'klpList' && attr != 'UUID' && lp[attr] != LekPrep[attr]) {
                 match = false;
                 break;

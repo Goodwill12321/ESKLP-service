@@ -139,130 +139,142 @@ function get_SMNN(name, only_actual, exactly, withKLP, userQuery = undefined, re
 
 }
 
+async function get_KLP_UUID_By_Code(klp_code, db)
+{
+    const col_KLP = db.collection("klp")
+    cursor = await col_KLP.find({"code" : klp_code})
+    let docs = [];
+    const allDocuments = await cursor.toArray();
+    if (allDocuments.length > 0)
+        return allDocuments[0].attr_UUID
+    else
+        return null
+}
 
-
-function get_LP(params, res, next) {
+async function get_LP(params, res, next) {
 
     try {
 
         uuid = uuidv4();
         timeStart('get_LP.' + uuid);
 
-        client.connect().then(mongoClient => {
-            curDate = new Date();
-            logging('main',"******************************");
-            logging('main',"get_LP");
-            logging('main',curDate + ". Подключение к БД установлено");
-            logging('main',"------------------------------");
+        mongoClient = await client.connect();
+        curDate = new Date();
+        logging('main',"******************************");
+        logging('main',"get_LP");
+        logging('main',curDate + ". Подключение к БД установлено");
+        logging('main',"------------------------------");
 
-            const db = client.db("esklp_service");
-            //коллекция МНН
-            const col_LP = db.collection("lp");
-            //ищем МНН по имени
-            let cursor = undefined;
+        const db = client.db("esklp_service");
+        //коллекция МНН
+        const col_LP = db.collection("lp");
+        //ищем МНН по имени
+        let cursor = undefined;
 
-            query_name = {};
-            if (params.mnn && params.mnn != "") {
-                if (params.exactly)
-                    query_name = { 'mnn': params.mnn };
-                else
-                    query_name = { 'mnn': { $regex: regExpEscape(params.mnn), $options: "i" } };
-            }
-
-            if (params.only_actual) {
-                date_end_cond = { $or: [{ "date_end": { $gt: new Date() }, "date_end": { $exists: false } }] };
-                if (Object.keys(query_name).length !== 0)
-                    query = { $and: [query_name, date_end_cond] };
-                else
-                    query = date_end_cond;
-            }
+        query_name = {};
+        if (params.mnn && params.mnn != "") {
+            if (params.exactly)
+                query_name = { 'mnn': params.mnn };
             else
-                query = query_name;
+                query_name = { 'mnn': { $regex: regExpEscape(params.mnn), $options: "i" } };
+        }
 
-            if ((Object.keys(query_name).length == 0) && ('trade_name' in params) && params.trade_name != "") {
-                query = { "mnn": { $ne: "" } };
+        if (params.only_actual) {
+            date_end_cond = { $or: [{ "date_end": { $gt: new Date() }, "date_end": { $exists: false } }] };
+            if (Object.keys(query_name).length !== 0)
+                query = { $and: [query_name, date_end_cond] };
+            else
+                query = date_end_cond;
+        }
+        else
+            query = query_name;
+
+        if ((Object.keys(query_name).length == 0) && ('trade_name' in params) && params.trade_name != "") {
+            query = { "mnn": { $ne: "" } };
+        }
+
+        if ('trade_name' in params)
+            if (params.exactly)
+                query = { $and: [query, { "trade_name": params.trade_name }] };
+            else
+                query = { $and: [query, { "trade_name": { $regex: regExpEscape(params.trade_name), $options: "i" } }] };
+
+        if ('dosage' in params)
+            if (params.exactly)
+                query = { $and: [query, { $or: [{ "dosage_norm_name": params.dosage }, { "dosage_unit_name": params.dosage }] }] };
+            else
+                query = { $and: [query, { $or: [{ "dosage_norm_name": { $regex: regExpEscape(params.dosage), $options: "i" } }, { "dosage_unit_name": { $regex: regExpEscape(params.dosage), $options: "i" } }] }] };
+
+        if ('lek_form' in params)
+            if (params.exactly)
+                query = { $and: [query, { "lf_norm_name": params.lek_form }] };
+            else
+                query = { $and: [query, { "lf_norm_name": { $regex: regExpEscape(params.lek_form), $options: "i" } }] };
+        if ('pack_1_name' in params)
+            if (params.exactly)
+                query = { $and: [query, { "pack1_name": params.pack_1_name }] };
+            else
+                query = { $and: [query, { "pack1_name": { $regex: regExpEscape(params.pack_1_name), $options: "i" } }] };
+        if ('manufacturer' in params)
+            //if (params.exactly)
+            //    query = { $and: [query, { "manufacturer_name": params.manufacturer }] };
+            //else
+                query = { $and: [query, { "manufacturer_name": { $regex: regExpEscape(params.manufacturer), $options: "i" } }] };
+        if ('num_reg' in params)
+            query = { $and: [query, { "num_reg": params.num_reg }] };
+
+        if ('klp_code' in params)
+        {
+            klp_UUID = await get_KLP_UUID_By_Code(params.klp_code, db);
+            query = { $and: [query, {"klpList" : {$elemMatch: {$eq : klp_UUID}}}] };
+        }
+            
+
+        logging('main','query = ' + JSON.stringify(query));
+
+        distinct = false;
+        if ('distinct' in params) {
+            distinct = true;
+            distinct_fields = params.distinct;
+        }
+
+
+        cursor = col_LP.find(query).sort({ 'mnn': 1, 'trade_name': 1, 'date_change': -1, 'lf_norm_name': 1, 'dosage_norm_name': 1 }).collation({ locale: 'ru', strength: 1 });
+
+
+        //массив возвращаемых документов
+        let docs = [];
+        //асинхронный вызов получения массива документов
+        const arr = await cursor.toArray();
+
+        res_doc = {};
+        if (distinct) {
+            docs.push(res_doc);
+            for (field of distinct_fields)
+                res_doc[field] = [];
+        }
+        arr.forEach(doc => {
+            //добавляем в коллекцию документ МНН
+            if (distinct) {
+                for (field of distinct_fields)
+                    if (res_doc[field].indexOf(doc[field]) == -1)
+                        res_doc[field].push(doc[field]);
             }
-
-            if ('trade_name' in params)
-                if (params.exactly)
-                    query = { $and: [query, { "trade_name": params.trade_name }] };
-                else
-                    query = { $and: [query, { "trade_name": { $regex: regExpEscape(params.trade_name), $options: "i" } }] };
-
-            if ('dosage' in params)
-                if (params.exactly)
-                    query = { $and: [query, { $or: [{ "dosage_norm_name": params.dosage }, { "dosage_unit_name": params.dosage }] }] };
-                else
-                    query = { $and: [query, { $or: [{ "dosage_norm_name": { $regex: regExpEscape(params.dosage), $options: "i" } }, { "dosage_unit_name": { $regex: regExpEscape(params.dosage), $options: "i" } }] }] };
-
-            if ('lek_form' in params)
-                if (params.exactly)
-                    query = { $and: [query, { "lf_norm_name": params.lek_form }] };
-                else
-                    query = { $and: [query, { "lf_norm_name": { $regex: regExpEscape(params.lek_form), $options: "i" } }] };
-            if ('pack_1_name' in params)
-                if (params.exactly)
-                    query = { $and: [query, { "pack1_name": params.pack_1_name }] };
-                else
-                    query = { $and: [query, { "pack1_name": { $regex: regExpEscape(params.pack_1_name), $options: "i" } }] };
-            if ('manufacturer' in params)
-                //if (params.exactly)
-                //    query = { $and: [query, { "manufacturer_name": params.manufacturer }] };
-                //else
-                    query = { $and: [query, { "manufacturer_name": { $regex: regExpEscape(params.manufacturer), $options: "i" } }] };
-            if ('num_reg' in params)
-                query = { $and: [query, { "num_reg": params.num_reg }] };
-
-            logging('main','query = ' + JSON.stringify(query));
-
-            distinct = false;
-            if ('distinct' in params) {
-                distinct = true;
-                distinct_fields = params.distinct;
+            else {
+                // logging('main',doc);
+                docs.push(doc);
             }
-
-
-            cursor = col_LP.find(query).sort({ 'mnn': 1, 'trade_name': 1, 'date_change': -1, 'lf_norm_name': 1, 'dosage_norm_name': 1 }).collation({ locale: 'ru', strength: 1 });
-
-
-            //массив возвращаемых документов
-            let docs = [];
-            //асинхронный вызов получения массива документов
-            const allDocuments = cursor.toArray();
-
-
-            allDocuments.then(arr => {
-                res_doc = {};
-                if (distinct) {
-                    docs.push(res_doc);
-                    for (field of distinct_fields)
-                        res_doc[field] = [];
-                }
-                arr.forEach(doc => {
-                    //добавляем в коллекцию документ МНН
-                    if (distinct) {
-                        for (field of distinct_fields)
-                            if (res_doc[field].indexOf(doc[field]) == -1)
-                                res_doc[field].push(doc[field]);
-                    }
-                    else {
-                        // logging('main',doc);
-                        docs.push(doc);
-                    }
-
-                });
-
-                //ждем все обработки всех массивов. promises - это массив промисов, каждый из которых возвращает массив КЛП. 
-                // Т.е. результатом ожидания будет массив массивов arraysKLP
-                logging('main','get_LP.' + uuid + '. Получено ЛП ' + docs.length);
-                res.send(docs);
-                timeEnd('get_LP.' + uuid);
-                logging('main',"------------------------------");
-                logging('main',"******************************");
-            });
-            ;
 
         });
+
+        //ждем все обработки всех массивов. promises - это массив промисов, каждый из которых возвращает массив КЛП. 
+        // Т.е. результатом ожидания будет массив массивов arraysKLP
+        logging('main','get_LP.' + uuid + '. Получено ЛП ' + docs.length);
+        res.send(docs);
+        timeEnd('get_LP.' + uuid);
+        logging('main',"------------------------------");
+        logging('main',"******************************");
+        
     } catch (error) {
         console.error(error);
         handleError(error, res);
