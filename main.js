@@ -207,9 +207,9 @@ async function get_LP(params, res, next) {
 
         if ('lek_form' in params)
             if (params.exactly)
-                query = { $and: [query, { "lf_norm_name": params.lek_form }] };
+                query = { $and: [query, { "form": params.lek_form }] };
             else
-                query = { $and: [query, { "lf_norm_name": { $regex: regExpEscape(params.lek_form), $options: "i" } }] };
+                query = { $and: [query, { "form": { $regex: regExpEscape(params.lek_form), $options: "i" } }] };
         if ('pack_1_name' in params)
             if (params.exactly)
                 query = { $and: [query, { "pack1_name": params.pack_1_name }] };

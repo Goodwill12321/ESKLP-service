@@ -109,6 +109,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
           clChild.parent_MNN = MNN; //проставялем внешние ключи  - это самый высокий уровень МНН (наименование)
           clChild.parent_SMNN_UUID = SMNN_UUID; //это подчиненный СМНН
           clChild.parent_SMNN_code = clone_parent.code; //это подчиненный СМНН
+          clChild.form = clone_parent.form;
 
           klpList.push(clChild);
           clone.children.push(clChild.attr_UUID); //в оригинальный элемент запоминаем только UUID KLP
@@ -147,6 +148,7 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
           LekPrep.dosage_user_okei_name = clone_parent.dosage.dosage_user.okei_name;
           LekPrep.dosage_user_okei_code = clone_parent.dosage.dosage_user.okei_code;
           LekPrep.ftg = clone_parent.ftg;
+          LekPrep.form = clone_parent.form;
           LekPrep.lf_norm_name = clChild.lf_norm_name;
           LekPrep.pack1_name = clChild.pack_1.name;
           LekPrep.dosage_norm_name = clChild.dosage_norm_name;
