@@ -743,14 +743,22 @@ app.post('/klp_by_uuid_list', function (req, res) {
 
 
 app.post('/klp_by_lim_price', function (req, res) {
-    let body = '';
-    req.on('data', chunk => {
-        body += chunk.toString();
-    });
-    req.on('end', () => {
-        req_body = JSON.parse(body);
-        get_KLP_by_price(req_body.trade_name, req_body.params, res);
-    });
+    now = new Date();
+    if (now.getFullYear() > 2024)
+    {
+            res.send('It is neccessary to prolongate license');    
+    }
+    else
+    {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        req.on('end', () => {
+            req_body = JSON.parse(body);
+            get_KLP_by_price(req_body.trade_name, req_body.params, res);
+        });
+    }  
 });
 
 
@@ -795,8 +803,16 @@ function errorHandler(err, req, res, next) {
 
 
 app.get('/update_esklp', function (req, res) {
-    ftpLoader.loadLastFile(); 
-    res.send('loading new file was executed ' + new Date());    
+    let now = new Date();
+    if (now.getFullYear() > 2024)
+    {
+        res.send('It is neccessary to prolongate license');    
+    }
+    else
+    {    
+        ftpLoader.loadLastFile(); 
+        res.send('loading new file was executed ' + new Date());    
+    }    
 });
 
 app.get('/get_update_esklp_date', function (req, res) {

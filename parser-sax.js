@@ -172,6 +172,14 @@ function cloneTag(tag, copy_parent = 100, copy_children = true, level = 1, smnnL
               }
             }
             if (match) {
+              for (let attr in lp) {
+                if (attr != 'klpList' && attr != 'UUID' && lp[attr] != LekPrep[attr]) {
+                  match = false;
+                  break;
+                }
+              }
+            }
+            if (match) {
               LPRef = lp;
               isLPExist = true;
               break;
@@ -372,10 +380,14 @@ async function loadFile(filePath, fileNameZIP = "", endOfLoadCallback = undefine
     await collectionMNN.deleteMany({});
     await collectionSMNN.deleteMany({});
 
+    collectionSMNN.createIndex({"attr_UUID" : 1});
+
+    
     collectionLP.createIndex({ "manufacturer_name": 1 });
     collectionLP.createIndex({ "mnn": 1 });
     collectionLP.createIndex({ "num_reg": 1 });
     collectionLP.createIndex({ "trade_name": 1 });
+    
     
 
     await collectionKLP.deleteMany({});
