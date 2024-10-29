@@ -172,6 +172,7 @@ async function get_LP(params, res, next) {
         let cursor = undefined;
 
         query_name = {};
+        
         if (params.mnn && params.mnn != "") {
             if (params.exactly)
                 query_name = { 'mnn': params.mnn };
@@ -220,8 +221,12 @@ async function get_LP(params, res, next) {
             //    query = { $and: [query, { "manufacturer_name": params.manufacturer }] };
             //else
                 query = { $and: [query, { "manufacturer_name": { $regex: regExpEscape(params.manufacturer), $options: "i" } }] };
+        
         if ('num_reg' in params)
-            query = { $and: [query, { "num_reg": params.num_reg }] };
+            if(Object.keys(query).length == 0)
+                query = { "num_reg": params.num_reg};
+            else    
+                query = { $and: [query, { "num_reg": params.num_reg }] };
 
         if ('klp_code' in params)
         {
