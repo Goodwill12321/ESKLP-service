@@ -228,14 +228,47 @@ async function get_LP(params, res, next) {
             else    
                 query = { $and: [query, { "num_reg": params.num_reg }] };
 
-        if ('klp_code' in params)
+        /*if ('klp_code' in params)
         {
             klp_UUID = await get_KLP_UUID_By_Code(params.klp_code, db);
             query = { $and: [query, {"klpList" : {$elemMatch: {$eq : klp_UUID}}}] };
-        }
+        }*/
+
+        if ('klp_code' in params)
+        {
+            klp_UUID = await get_KLP_UUID_By_Code(params.klp_code, db);
+            query = { $and: [query, {"klpList" : klp_UUID}] };
+            query_agg = [
+                {
+                    $match:
+                        query
+                },
+                {
+                    $addFields: {
+                        klpList: {
+                            $filter : {
+                                input : "$klpList",
+                                as: "item",
+                                cond :{$eq : ["$$item", klp_UUID]}
+                            }
+                        }
+                        
+                    }
+                }
+            ];
+
+            logging('main','query = ' + JSON.stringify(query_agg));
+            cursor = col_LP.aggregate(query_agg).sort({ 'mnn': 1, 'trade_name': 1, 'date_change': -1, 'lf_norm_name': 1, 'dosage_norm_name': 1 })//.collation({ locale: 'ru', strength: 1 });
+        } 
+        else
+        {
+            
+            logging('main','query = ' + JSON.stringify(query));
+            cursor = col_LP.find(query).sort({ 'mnn': 1, 'trade_name': 1, 'date_change': -1, 'lf_norm_name': 1, 'dosage_norm_name': 1 }).collation({ locale: 'ru', strength: 1 });
+
+        }    
             
 
-        logging('main','query = ' + JSON.stringify(query));
 
         distinct = false;
         if ('distinct' in params) {
@@ -244,7 +277,7 @@ async function get_LP(params, res, next) {
         }
 
 
-        cursor = col_LP.find(query).sort({ 'mnn': 1, 'trade_name': 1, 'date_change': -1, 'lf_norm_name': 1, 'dosage_norm_name': 1 }).collation({ locale: 'ru', strength: 1 });
+        
 
 
         //массив возвращаемых документов
@@ -749,11 +782,11 @@ app.post('/klp_by_uuid_list', function (req, res) {
 
 app.post('/klp_by_lim_price', function (req, res) {
     now = new Date();
-    if (now.getFullYear() > 2024)
+    /*if (now.getFullYear() > 2024)
     {
             res.send('It is neccessary to prolongate license');    
     }
-    else
+    else*/
     {
         let body = '';
         req.on('data', chunk => {
@@ -809,11 +842,11 @@ function errorHandler(err, req, res, next) {
 
 app.get('/update_esklp', function (req, res) {
     let now = new Date();
-    if (now.getFullYear() > 2024)
+    /*if (now.getFullYear() > 2024)
     {
         res.send('It is neccessary to prolongate license');    
     }
-    else
+    else*/
     {    
         ftpLoader.loadLastFile(); 
         res.send('loading new file was executed ' + new Date());    
