@@ -392,6 +392,7 @@ async function loadFile(filePath, fileNameZIP = "", endOfLoadCallback = undefine
 
     await collectionKLP.deleteMany({});
     collectionKLP.createIndex({ "attr_UUID": 1 });
+    collectionKLP.createIndex({ "code": 1 });
     collectionKLP.createIndex({ "klp_lim_price_list.children.price_value": 1 });
     collectionKLP.createIndex({ "num_reg": 1 });
     collectionKLP.createIndex({ "parent_SMNN_UUID": 1 })
