@@ -33,7 +33,7 @@ var fs = require('fs');
 
 const logging = require('./logger.js');
 
-const ftpLoader = require('./ftp-esklp.js');
+const fileLoader = require('./file-loader.js');
 
 function regExpEscape(literal_string) {
     return literal_string.replace(/[-[\]{}()*+!<=:?.\/\\^$|#\s,]/g, '\\$&');
@@ -813,24 +813,6 @@ app.get('/MNN_by_partname/:mnn', function (req, res) {
 
 
 
-/*const bodyParser = require('body-parser');
-// после инициализации const app
- app.use(bodyParser.urlencoded({ extended: true}));
- app.use(bodyParser.json());
-// в методах:
-
- app.post('/posts', function(req, res) {
-    // получаем данные из тела запроса и сохраняем в конст.
-    const data = req.body;
-    // посмотрим что у нас там? 
-    logging('main',data);
-    // добавляем полученные данные к постам
-    posts.push(data);
-    // чтобы не было бесконечного цикла - вернем все посты на страницу
-    return res.send(posts);
-});*/
-
-
 function errorHandler(err, req, res, next) {
     if (res.headersSent) {
         return next(err);
@@ -848,7 +830,7 @@ app.get('/update_esklp', function (req, res) {
     }
     else*/
     {    
-        ftpLoader.loadLastFile(); 
+        fileLoader.loadLastFile(); 
         res.send('loading new file was executed ' + new Date());    
     }    
 });

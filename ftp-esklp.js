@@ -5,7 +5,11 @@ const ftp = require("basic-ftp");
 
 const key = 'dfsjvgndfkekjbnweyw23424kjnkj536kj';
 const ftpUserFileName = __dirname + '/ftp-user.json';
-const downloadDir = __dirname + '/ESKLP_download';
+
+const parser = require('./parser-sax.js');
+//const extractZip = require('extract-zip')
+const logging = require('./logger.js');
+//const path = require('path');
 
 // Функция для шифрования пароля
 function encrypt(password) {
@@ -53,7 +57,7 @@ function readUserFromFile() {
 }
 
 
-async function get_LastFileFrom_FTP() {
+async function get_LastFileFrom_FTP(downloadDir) {
     const client = new ftp.Client()
     client.ftp.verbose = false;
     userInfo = readUserFromFile();
@@ -117,61 +121,15 @@ async function get_LastFileFrom_FTP() {
 }
 
 
-const parser = require('./parser-sax.js');
-const extractZip = require('extract-zip')
-const logging = require('./logger.js');
-const path = require('path');
+
 
 let fileNameZIP = "";
 
-async function loadLastFile()
+async function loadLastFile(downloadDir)
 {
-    fileNameZIP = await get_LastFileFrom_FTP();
+    return await get_LastFileFrom_FTP(downloadDir);
     
-    if (fileNameZIP === null)
-    {
-        return null;
-    }
-    let extractDir = downloadDir + "/extract/";
-    let fileXml = fileNameZIP.replace('.zip', '');
-    let filePathXML = extractDir + path.basename(fileXml);
-
-    try{
-        fs.accessSync(filePathXML);
-        logging('ftp', 'File ' + filePathXML + ' have been already extracted from zip');
-        return;
-    }
-    catch (err) {
-        logging('ftp', 'Extracting file ' + fileNameZIP + ' to folder ' + extractDir);
-        await extractZip(fileNameZIP, { dir: extractDir});
-        
-        const fileList = fs.readdirSync(extractDir);
-        for (const fileXml of fileList) {
-            logging('ftp', 'Loading file ' + fileXml + ' in folder ' + extractDir);
-            filePath = extractDir + fileXml;
-            parser.loadFile(filePath, fileNameZIP, clearFiles);
-            break;
-    }
-    /*logging('ftp', 'Removing dir ' + extractDir);
-    fs.rmdirSync(extractDir); 
-    logging('ftp', 'Removing file ' + fileName);
-    fs.unlinkSync(fileName); */
-    }
-}
-
-function clearFiles(fileName)
-{
-    let extractDir = downloadDir + "/extract/";
-    logging('ftp', 'Removing file ' + fileName);
-    fs.unlinkSync(fileName);
-    while (fs.existsSync(fileName))
-    {
-        sleep(1000); 
-    }       
-    logging('ftp', 'Removing dir ' + extractDir);
-    fs.rmdirSync(extractDir); 
-    logging('ftp', 'Removing file ' + fileNameZIP);
-    fs.unlinkSync(fileNameZIP);        
+ 
 }
 
 
@@ -181,7 +139,7 @@ if (require.main === module) {
     else
     {   if(process.argv[2] == '--load-file')
         {
-            loadLastFile();
+            loadLastFile('.').then(destPath=>{console.log(destPath)});;
         }
         else if(process.argv.length == 4)    
              writeUser2File(process.argv[2], process.argv[3]);
