@@ -843,6 +843,12 @@ app.get('/update_esklp', function (req, res) {
     }    
 });
 
+app.post('/update_esklp', function (req, res) {
+    let now = new Date();
+    fileLoader.loadLastFile();
+    res.redirect('/');
+});
+
 app.get('/get_update_esklp_date', function (req, res) {
     get_Update_ESKLP_Date(res);  
 });
