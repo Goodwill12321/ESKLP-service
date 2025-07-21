@@ -2,13 +2,16 @@ version: '3.8'
 
 services:
   mongodb:
-    image: mongo:6.0
+    image: mongo:4.4
     container_name: esklp-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "27318:27017"
     volumes:
       - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=esklpuser
+      - MONGO_INITDB_ROOT_PASSWORD=6jwQpqreXTqJ
 
   dev:
     container_name: esklp-dev
