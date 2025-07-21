@@ -22,11 +22,10 @@ services:
       - ./:/usr/src/app
       - ./log:/usr/src/app/log
     ports:
-      - "3000:3000"
+      - "80:3000"
       - "9229:9229"
     environment:
       - NODE_ENV=development
-      - TZ=Europe/Moscow
     depends_on:
       - mongodb
 
@@ -36,10 +35,9 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "80:3000"
     environment:
       - NODE_ENV=production
-      - TZ=Europe/Moscow
     volumes:
       - ./log:/usr/src/app/log
     restart: unless-stopped
