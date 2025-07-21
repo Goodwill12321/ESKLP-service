@@ -1,6 +1,15 @@
 version: '3.8'
 
 services:
+  mongodb:
+    image: mongo:6.0
+    container_name: esklp-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
   dev:
     container_name: esklp-dev
     build:
@@ -13,6 +22,8 @@ services:
       - "9229:9229"
     environment:
       - NODE_ENV=development
+    depends_on:
+      - mongodb
 
   prod:
     container_name: esklp-prod
@@ -24,3 +35,5 @@ services:
     environment:
       - NODE_ENV=production
     restart: unless-stopped
+    depends_on:
+      - mongodb
