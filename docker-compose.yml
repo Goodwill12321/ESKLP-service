@@ -22,6 +22,7 @@ services:
     volumes:
       - ./:/usr/src/app
       - ./log:/usr/src/app/log
+      - ./ESKLP_download:/usr/src/app/ESKLP_download
     ports:
       - "80:3000"
       - "9229:9229"
@@ -43,6 +44,7 @@ services:
       - TZ=Europe/Moscow
     volumes:
       - ./log:/usr/src/app/log
+      - ./ESKLP_download:/usr/src/app/ESKLP_download
     restart: unless-stopped
     depends_on:
       - mongodb

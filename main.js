@@ -874,8 +874,8 @@ app.get('/', async function(req, res) {
         // Получаем дату последнего обновления через вашу функцию
         const updateInfo = await getLastUpdateInfo(db);
 
-        let html = '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Информация о базе ЕСКЛП v1</title></head><body>';
-        html += '<h1>Информация о базе ЕСКЛП</h1><div>';
+        let html = '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Информация о базе ЕСКЛП</title></head><body>';
+        html += '<h1>Информация о базе ЕСКЛП v1</h1><div>';
 
         if (updating) {
             html += '<p><b>Идет обновление базы...</b><br>';
