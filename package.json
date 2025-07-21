@@ -4,8 +4,8 @@
   "description": "REST API Service, giving esklp reference updated from goverment FTP",
   "main": "main.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js"
+    "start": "node main.js", 
+    "dev": "nodemon main.js"
   },
   "repository": {
     "type": "git",
