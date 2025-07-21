@@ -37,3 +37,7 @@ services:
     restart: unless-stopped
     depends_on:
       - mongodb
+
+
+volumes:
+  mongo_data:
