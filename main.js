@@ -647,40 +647,48 @@ function test_Func()
     
 }
 
-function get_Update_ESKLP_Date(res) {
+async function getLastUpdateInfo(db) {
+    let uuid = uuidv4();
+    timeStart('getLastUpdateInfo.' + uuid);
+    logging('main', 'getLastUpdateInfo: start');
     try {
-        uuid = uuidv4();
-        timeStart('get_Update_ESKLP_Date.'+ uuid);
-        client.connect().then(mongoClient => {
-            logging('main', "Connected to DB");
+        // Проверяем наличие коллекции
+        const collections = await db.listCollections({ name: "load_info" }).toArray();
+        if (!collections || collections.length === 0) {
+            logging('main', 'getLastUpdateInfo: коллекция load_info отсутствует');
+            timeEnd('getLastUpdateInfo.' + uuid);
+            return { initialized: false };
+        }
+        const collectionLoadinfo = db.collection("load_info");
+        const cursorLoadDate = collectionLoadinfo.find().sort({ "update_time": -1 }).limit(1);
+        const arr = await cursorLoadDate.toArray();
+        if (arr.length === 0) {
+            logging('main', 'getLastUpdateInfo: коллекция есть, но записей нет');
+            timeEnd('getLastUpdateInfo.' + uuid);
+            return { initialized: false };
+        } else {
+            logging('main', 'getLastUpdateInfo: найдено обновление');
+            timeEnd('getLastUpdateInfo.' + uuid);
+            return { initialized: true, updateDate: arr[0].update_time };
+        }
+    } catch (error) {
+        logging('main', 'getLastUpdateInfo: ошибка ' + error);
+        timeEnd('getLastUpdateInfo.' + uuid);
+        return { initialized: false };
+    }
+}
 
-            const db = client.db("esklp_service");
-            //подчиненная коллекция КЛП (связываются по внешнему ключу parent_SMNN_UUID с элементами SMNN_LIST элемента MNN)
-            const connLoad_info = db.collection("load_info");
-            //ищем МНН по имени
-            const cursorLoadDate = connLoad_info.find().sort({"update_time" : -1}).limit(1);
-
-            //массив возвращаемых документов
-            let docs = [];
-            //асинхронный вызов получения массива документов
-            const allDocuments = cursorLoadDate.toArray();
-
-
-            allDocuments.then(arr => {
-                arr.forEach(doc => {
-                    //добавляем в коллекцию документ МНН, но он еще не обогащен подчиненными элементами - это будет асинхронно потом после Promise.all 
-                    docs.push(doc);
-                });
-            }).then(r => {   //после того, как все заполнено, возвращаем KLP
-                res.send(docs);
-                timeEnd('get_Update_ESKLP_Date.' + uuid);
-            });
-        });
+app.get('/get_update_esklp_date', async function (req, res) {
+    try {
+        await client.connect();
+        const db = client.db("esklp_service");
+        const updateInfo = await getLastUpdateInfo(db);
+        res.send(updateInfo);
     } catch (error) {
         console.error(error);
         handleError(error, res);
     }
-}
+});
 
 
 app.get('/smnn_by_name/:exact/:with_klp/:only_actual/:name', function (req, res) {
@@ -839,6 +847,56 @@ app.get('/get_update_esklp_date', function (req, res) {
     get_Update_ESKLP_Date(res);  
 });
 
+
+app.get('/', async function(req, res) {
+    try {
+        await client.connect();
+        const db = client.db("esklp_service");
+
+        // Проверяем статус обновления
+        let updating = null;
+        try {
+            const collectionLoadinfoStart = db.collection("load_info_start");
+            updating = await collectionLoadinfoStart.findOne(
+                { start_time: { $gt: new Date(Date.now() - 20 * 60 * 1000) } },
+                { sort: { start_time: -1 } }
+            );
+        } catch (e) {
+            updating = null; // если коллекции нет или ошибка
+        }
+
+        // Получаем дату последнего обновления через вашу функцию
+        const updateInfo = await getLastUpdateInfo(db);
+
+        let html = '<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Информация о базе ЕСКЛП</title></head><body>';
+        html += '<h1>Информация о базе ЕСКЛП</h1><div>';
+
+        if (updating) {
+            html += '<p><b>Идет обновление базы...</b><br>';
+            html += 'Дата и время начала: ' + (updating.start_time ? new Date(updating.start_time).toLocaleString() : '-') + '<br>';
+            html += 'Имя файла: ' + (updating.file_name || '-') + '<br></p>';
+        }
+
+        html += '<p>';
+        if (!updateInfo.initialized) {
+            html += 'База еще не инициализирована';
+        } else {
+            html += 'Дата последнего обновления: ' + new Date(updateInfo.updateDate).toLocaleString();
+        }
+        html += '</p>';
+
+        if (!updating) {
+            html += '<form action="/update_esklp" method="post"><button type="submit">Обновить ЕСКЛП</button></form>';
+        }
+
+        html += '</div></body></html>';
+
+        res.send(html);
+    } catch (error) {
+        console.error(error);
+        handleError(error, res);
+    }
+});
 
 
 app.use(errorHandler);
