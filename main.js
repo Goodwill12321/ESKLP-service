@@ -886,7 +886,7 @@ app.get('/', async function(req, res) {
         html += '</p>';
 
         if (!updating) {
-            html += '<form action="/update_esklp" method="post"><button type="submit">Обновить ЕСКЛП</button></form>';
+            html += '<form action="/update_esklp" method="get"><button type="submit">Обновить ЕСКЛП</button></form>';
         }
 
         html += '</div></body></html>';
