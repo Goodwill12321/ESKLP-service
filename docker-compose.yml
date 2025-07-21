@@ -15,6 +15,7 @@ services:
       - TZ=Europe/Moscow 
 
   dev:
+    image: esklp-service
     container_name: esklp-dev
     build:
       context: .
@@ -33,6 +34,7 @@ services:
       - mongodb
 
   prod:
+    image: esklp-service
     container_name: esklp-prod
     build:
       context: .
