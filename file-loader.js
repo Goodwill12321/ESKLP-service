@@ -29,10 +29,10 @@ async function loadLastFile()
     
     fileNameZIP = await httpLoader.loadLastFile(downloadDir);
     
-    if (fileNameZIP === null)
+    if (!fileNameZIP)
     {
          fileNameZIP = await ftpLoader.loadLastFile(downloadDir);
-        if (fileNameZIP === null)
+        if (!fileNameZIP)
         {
             return null;
         }
