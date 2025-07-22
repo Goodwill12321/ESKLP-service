@@ -8,7 +8,7 @@ app.use(express.json());
 
 app.use(bodyParser.json())
 
-
+const db = require('./db.js');
 
 //const MongoClient = require("mongodb").MongoClient;
 const client = db.mongo;

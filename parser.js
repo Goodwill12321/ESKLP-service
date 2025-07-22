@@ -2,7 +2,8 @@ const MongoClient = require("mongodb").MongoClient;
 const fs = require("fs");
 const XmlStream = require("xml-stream");
  
-const client = db.mongo;;
+const db = require('./db.js');
+const client = db.mongo;
  
 
 client.connect().then((mongoClient=>{
