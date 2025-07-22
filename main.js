@@ -10,8 +10,8 @@ app.use(bodyParser.json())
 
 
 
-const MongoClient = require("mongodb").MongoClient;
-const client = new MongoClient("mongodb://esklpuser:6jwQpqreXTqJ@mongodb:27017");
+//const MongoClient = require("mongodb").MongoClient;
+const client = db.mongo;
 
 
 function handleError(error, res) {

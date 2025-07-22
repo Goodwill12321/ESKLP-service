@@ -2,7 +2,7 @@ const MongoClient = require("mongodb").MongoClient;
 const fs = require("fs");
 const XmlStream = require("xml-stream");
  
-const client = new MongoClient("mongodb://127.0.0.1:27017");
+const client = db.mongo;;
  
 
 client.connect().then((mongoClient=>{
