@@ -268,9 +268,9 @@ let smnnList = [];
 let lpList = [];
 
 
-const MongoClient = require("mongodb").MongoClient;
+const mongoDB = require("./db.js");
 
-const client = new MongoClient("mongodb://127.0.0.1:27017");
+const client = mongoDB.mongo;
 
 let db = undefined;
 let collectionMNN = undefined;
