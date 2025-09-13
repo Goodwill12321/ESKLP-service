@@ -26,7 +26,7 @@ services:
       - ./log:/usr/src/app/log
       - ./ESKLP_download:/usr/src/app/ESKLP_download
     ports:
-      - "80:3001"
+      - "3001:3001"
       - "9229:9229"
     environment:
       - NODE_ENV=development
@@ -41,7 +41,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "80:3000"
+      - "3000:3000"
     environment:
       - NODE_ENV=production
       - TZ=Europe/Moscow
