@@ -6,13 +6,14 @@ services:
     container_name: esklp-mongo
     restart: unless-stopped
     ports:
-      - "27318:27017"
+      - "127.0.0.1:27318:27017"
     volumes:
       - mongo_data:/data/db
     environment:
       - MONGO_INITDB_ROOT_USERNAME=esklpuser
       - MONGO_INITDB_ROOT_PASSWORD=6jwQpqreXTqJ
-      - TZ=Europe/Moscow 
+      - TZ=Europe/Moscow
+    mem_limit: 700m
 
   dev:
     image: esklp-service
@@ -48,10 +49,10 @@ services:
     volumes:
       - ./log:/usr/src/app/log
       - ./ESKLP_download:/usr/src/app/ESKLP_download
-    restart: unless-stopped
+    restart: always
     depends_on:
       - mongodb
-
+    mem_limit: 3100m
 
 volumes:
   mongo_data:
